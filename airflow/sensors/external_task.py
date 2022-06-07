@@ -18,23 +18,25 @@
 
 import datetime
 import os
+import warnings
 from typing import TYPE_CHECKING, Any, Callable, Collection, FrozenSet, Iterable, Optional, Union
 
+import attr
 from sqlalchemy import func
 
 from airflow.exceptions import AirflowException
 from airflow.models import BaseOperatorLink, DagBag, DagModel, DagRun, TaskInstance
-from airflow.operators.dummy import DummyOperator
+from airflow.operators.empty import EmptyOperator
 from airflow.sensors.base import BaseSensorOperator
 from airflow.utils.helpers import build_airflow_url_with_query
 from airflow.utils.session import provide_session
 from airflow.utils.state import State
 
 
-class ExternalTaskSensorLink(BaseOperatorLink):
+class ExternalDagLink(BaseOperatorLink):
     """
-    Operator link for ExternalTaskSensor. It allows users to access
-    DAG waited with ExternalTaskSensor.
+    Operator link for ExternalTaskSensor and ExternalTaskMarker.
+    It allows users to access DAG waited with ExternalTaskSensor or cleared by ExternalTaskMarker.
     """
 
     name = 'External DAG'
@@ -77,13 +79,13 @@ class ExternalTaskSensor(BaseSensorOperator):
         or DAG does not exist (default value: False).
     """
 
-    template_fields = ['external_dag_id', 'external_task_id']
+    template_fields = ['external_dag_id', 'external_task_id', 'external_task_ids']
     ui_color = '#19647e'
 
     @property
     def operator_extra_links(self):
         """Return operator extra links"""
-        return [ExternalTaskSensorLink()]
+        return [ExternalDagLink()]
 
     def __init__(
         self,
@@ -265,7 +267,7 @@ class ExternalTaskSensor(BaseSensorOperator):
         return kwargs_callable(logical_date, **kwargs)
 
 
-class ExternalTaskMarker(DummyOperator):
+class ExternalTaskMarker(EmptyOperator):
     """
     Use this operator to indicate that a task on a different DAG depends on this task.
     When this task is cleared with "Recursive" selected, Airflow will clear the task on
@@ -286,6 +288,11 @@ class ExternalTaskMarker(DummyOperator):
 
     # The _serialized_fields are lazily loaded when get_serialized_fields() method is called
     __serialized_fields: Optional[FrozenSet[str]] = None
+
+    @property
+    def operator_extra_links(self):
+        """Return operator extra links"""
+        return [ExternalDagLink()]
 
     def __init__(
         self,
@@ -318,3 +325,19 @@ class ExternalTaskMarker(DummyOperator):
         if not cls.__serialized_fields:
             cls.__serialized_fields = frozenset(super().get_serialized_fields() | {"recursion_depth"})
         return cls.__serialized_fields
+
+
+@attr.s(auto_attribs=True)
+class ExternalTaskSensorLink(ExternalDagLink):
+    """
+    This external link is deprecated.
+    Please use :class:`airflow.sensors.external_task.ExternalDagLink`.
+    """
+
+    def __attrs_post_init__(self):
+        warnings.warn(
+            "This external link is deprecated. "
+            "Please use :class:`airflow.sensors.external_task.ExternalDagLink`.",
+            DeprecationWarning,
+            stacklevel=2,
+        )

@@ -18,6 +18,7 @@
 
 import logging
 import sys
+import warnings
 from collections import defaultdict
 from datetime import datetime
 from operator import attrgetter
@@ -31,14 +32,21 @@ import pendulum
 from elasticsearch_dsl import Search
 
 from airflow.configuration import conf
-from airflow.models import TaskInstance
+from airflow.models.dagrun import DagRun
+from airflow.models.taskinstance import TaskInstance
 from airflow.utils import timezone
 from airflow.utils.log.file_task_handler import FileTaskHandler
 from airflow.utils.log.json_formatter import JSONFormatter
 from airflow.utils.log.logging_mixin import ExternalLoggingMixin, LoggingMixin
+from airflow.utils.session import create_session
 
 # Elasticsearch hosted log type
 EsLogMsgType = List[Tuple[str, str]]
+
+# Compatibility: Airflow 2.3.3 and up uses this method, which accesses the
+# LogTemplate model to record the log ID template used. If this function does
+# not exist, the task handler should use the log_id_template attribute instead.
+USE_PER_RUN_LOG_ID = hasattr(DagRun, "get_log_template")
 
 
 class ElasticsearchTaskHandler(FileTaskHandler, ExternalLoggingMixin, LoggingMixin):
@@ -65,8 +73,6 @@ class ElasticsearchTaskHandler(FileTaskHandler, ExternalLoggingMixin, LoggingMix
     def __init__(
         self,
         base_log_folder: str,
-        filename_template: str,
-        log_id_template: str,
         end_of_log_mark: str,
         write_stdout: bool,
         json_format: bool,
@@ -76,6 +82,9 @@ class ElasticsearchTaskHandler(FileTaskHandler, ExternalLoggingMixin, LoggingMix
         host: str = "localhost:9200",
         frontend: str = "localhost:5601",
         es_kwargs: Optional[dict] = conf.getsection("elasticsearch_configs"),
+        *,
+        filename_template: Optional[str] = None,
+        log_id_template: Optional[str] = None,
     ):
         """
         :param base_log_folder: base folder to store logs locally
@@ -86,9 +95,15 @@ class ElasticsearchTaskHandler(FileTaskHandler, ExternalLoggingMixin, LoggingMix
         super().__init__(base_log_folder, filename_template)
         self.closed = False
 
-        self.client = elasticsearch.Elasticsearch([host], **es_kwargs)
+        self.client = elasticsearch.Elasticsearch([host], **es_kwargs)  # type: ignore[attr-defined]
 
-        self.log_id_template = log_id_template
+        if USE_PER_RUN_LOG_ID and log_id_template is not None:
+            warnings.warn(
+                "Passing log_id_template to ElasticsearchTaskHandler is deprecated and has no effect",
+                DeprecationWarning,
+            )
+
+        self.log_id_template = log_id_template  # Only used on Airflow < 2.3.2.
         self.frontend = frontend
         self.mark_end_on_close = True
         self.end_of_log_mark = end_of_log_mark
@@ -103,36 +118,56 @@ class ElasticsearchTaskHandler(FileTaskHandler, ExternalLoggingMixin, LoggingMix
         self.handler: Union[logging.FileHandler, logging.StreamHandler]  # type: ignore[assignment]
 
     def _render_log_id(self, ti: TaskInstance, try_number: int) -> str:
-        dag_run = ti.dag_run
+        with create_session() as session:
+            dag_run = ti.get_dagrun(session=session)
+            if USE_PER_RUN_LOG_ID:
+                log_id_template = dag_run.get_log_template(session=session).elasticsearch_id
+            else:
+                log_id_template = self.log_id_template
+
+        dag = ti.task.dag
+        assert dag is not None  # For Mypy.
+        try:
+            data_interval: Tuple[datetime, datetime] = dag.get_run_data_interval(dag_run)
+        except AttributeError:  # ti.task is not always set.
+            data_interval = (dag_run.data_interval_start, dag_run.data_interval_end)
 
         if self.json_format:
-            data_interval_start = self._clean_date(dag_run.data_interval_start)
-            data_interval_end = self._clean_date(dag_run.data_interval_end)
+            data_interval_start = self._clean_date(data_interval[0])
+            data_interval_end = self._clean_date(data_interval[1])
             execution_date = self._clean_date(dag_run.execution_date)
         else:
-            data_interval_start = dag_run.data_interval_start.isoformat()
-            data_interval_end = dag_run.data_interval_end.isoformat()
+            if data_interval[0]:
+                data_interval_start = data_interval[0].isoformat()
+            else:
+                data_interval_start = ""
+            if data_interval[1]:
+                data_interval_end = data_interval[1].isoformat()
+            else:
+                data_interval_end = ""
             execution_date = dag_run.execution_date.isoformat()
 
-        return self.log_id_template.format(
+        return log_id_template.format(
             dag_id=ti.dag_id,
             task_id=ti.task_id,
-            run_id=ti.run_id,
+            run_id=getattr(ti, "run_id", ""),
             data_interval_start=data_interval_start,
             data_interval_end=data_interval_end,
             execution_date=execution_date,
             try_number=try_number,
+            map_index=getattr(ti, "map_index", ""),
         )
 
     @staticmethod
-    def _clean_date(value: datetime) -> str:
+    def _clean_date(value: Optional[datetime]) -> str:
         """
         Clean up a date value so that it is safe to query in elasticsearch
         by removing reserved characters.
-        # https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#_reserved_characters
 
-        :param execution_date: execution date of the dag run.
+        https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html#_reserved_characters
         """
+        if value is None:
+            return ""
         return value.strftime("%Y_%m_%dT%H_%M_%S_%f")
 
     def _group_logs_by_host(self, logs):
@@ -272,7 +307,7 @@ class ElasticsearchTaskHandler(FileTaskHandler, ExternalLoggingMixin, LoggingMix
 
     def emit(self, record):
         if self.handler:
-            record.offset = int(time() * (10 ** 9))
+            record.offset = int(time() * (10**9))
             self.handler.emit(record)
 
     def set_context(self, ti: TaskInstance) -> None:
@@ -353,7 +388,6 @@ class ElasticsearchTaskHandler(FileTaskHandler, ExternalLoggingMixin, LoggingMix
         Creates an address for an external log collecting service.
 
         :param task_instance: task instance object
-        :type: task_instance: TaskInstance
         :param try_number: task instance try_number to read logs from.
         :return: URL to the external log collection service
         :rtype: str

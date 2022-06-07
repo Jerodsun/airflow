@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Dict, Optional, Sequence, Tuple, Union
 
 import pytz
 from google.api_core.exceptions import AlreadyExists
+from google.api_core.gapic_v1.method import DEFAULT, _MethodDefault
 from google.api_core.retry import Retry
 from google.cloud.workflows.executions_v1beta import Execution
 from google.cloud.workflows_v1beta import Workflow
@@ -30,6 +31,11 @@ from google.protobuf.field_mask_pb2 import FieldMask
 
 from airflow.models import BaseOperator
 from airflow.providers.google.cloud.hooks.workflows import WorkflowsHook
+from airflow.providers.google.cloud.links.workflows import (
+    WorkflowsExecutionLink,
+    WorkflowsListOfWorkflowsLink,
+    WorkflowsWorkflowDetailsLink,
+)
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context
@@ -59,6 +65,7 @@ class WorkflowsCreateWorkflowOperator(BaseOperator):
 
     template_fields: Sequence[str] = ("location", "workflow", "workflow_id")
     template_fields_renderers = {"workflow": "json"}
+    operator_extra_links = (WorkflowsWorkflowDetailsLink(),)
 
     def __init__(
         self,
@@ -67,7 +74,7 @@ class WorkflowsCreateWorkflowOperator(BaseOperator):
         workflow_id: str,
         location: str,
         project_id: Optional[str] = None,
-        retry: Optional[Retry] = None,
+        retry: Union[Retry, _MethodDefault] = DEFAULT,
         timeout: Optional[float] = None,
         metadata: Sequence[Tuple[str, str]] = (),
         gcp_conn_id: str = "google_cloud_default",
@@ -131,6 +138,15 @@ class WorkflowsCreateWorkflowOperator(BaseOperator):
                 timeout=self.timeout,
                 metadata=self.metadata,
             )
+
+        WorkflowsWorkflowDetailsLink.persist(
+            context=context,
+            task_instance=self,
+            location_id=self.location,
+            workflow_id=self.workflow_id,
+            project_id=self.project_id or hook.project_id,
+        )
+
         return Workflow.to_dict(workflow)
 
 
@@ -161,6 +177,7 @@ class WorkflowsUpdateWorkflowOperator(BaseOperator):
 
     template_fields: Sequence[str] = ("workflow_id", "update_mask")
     template_fields_renderers = {"update_mask": "json"}
+    operator_extra_links = (WorkflowsWorkflowDetailsLink(),)
 
     def __init__(
         self,
@@ -169,7 +186,7 @@ class WorkflowsUpdateWorkflowOperator(BaseOperator):
         location: str,
         project_id: Optional[str] = None,
         update_mask: Optional[FieldMask] = None,
-        retry: Optional[Retry] = None,
+        retry: Union[Retry, _MethodDefault] = DEFAULT,
         timeout: Optional[float] = None,
         metadata: Sequence[Tuple[str, str]] = (),
         gcp_conn_id: str = "google_cloud_default",
@@ -208,6 +225,15 @@ class WorkflowsUpdateWorkflowOperator(BaseOperator):
             metadata=self.metadata,
         )
         workflow = operation.result()
+
+        WorkflowsWorkflowDetailsLink.persist(
+            context=context,
+            task_instance=self,
+            location_id=self.location,
+            workflow_id=self.workflow_id,
+            project_id=self.project_id or hook.project_id,
+        )
+
         return Workflow.to_dict(workflow)
 
 
@@ -239,7 +265,7 @@ class WorkflowsDeleteWorkflowOperator(BaseOperator):
         workflow_id: str,
         location: str,
         project_id: Optional[str] = None,
-        retry: Optional[Retry] = None,
+        retry: Union[Retry, _MethodDefault] = DEFAULT,
         timeout: Optional[float] = None,
         metadata: Sequence[Tuple[str, str]] = (),
         gcp_conn_id: str = "google_cloud_default",
@@ -295,6 +321,7 @@ class WorkflowsListWorkflowsOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = ("location", "order_by", "filter_")
+    operator_extra_links = (WorkflowsListOfWorkflowsLink(),)
 
     def __init__(
         self,
@@ -303,7 +330,7 @@ class WorkflowsListWorkflowsOperator(BaseOperator):
         project_id: Optional[str] = None,
         filter_: Optional[str] = None,
         order_by: Optional[str] = None,
-        retry: Optional[Retry] = None,
+        retry: Union[Retry, _MethodDefault] = DEFAULT,
         timeout: Optional[float] = None,
         metadata: Sequence[Tuple[str, str]] = (),
         gcp_conn_id: str = "google_cloud_default",
@@ -334,6 +361,13 @@ class WorkflowsListWorkflowsOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+
+        WorkflowsListOfWorkflowsLink.persist(
+            context=context,
+            task_instance=self,
+            project_id=self.project_id or hook.project_id,
+        )
+
         return [Workflow.to_dict(w) for w in workflows_iter]
 
 
@@ -356,6 +390,7 @@ class WorkflowsGetWorkflowOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = ("location", "workflow_id")
+    operator_extra_links = (WorkflowsWorkflowDetailsLink(),)
 
     def __init__(
         self,
@@ -363,7 +398,7 @@ class WorkflowsGetWorkflowOperator(BaseOperator):
         workflow_id: str,
         location: str,
         project_id: Optional[str] = None,
-        retry: Optional[Retry] = None,
+        retry: Union[Retry, _MethodDefault] = DEFAULT,
         timeout: Optional[float] = None,
         metadata: Sequence[Tuple[str, str]] = (),
         gcp_conn_id: str = "google_cloud_default",
@@ -392,6 +427,15 @@ class WorkflowsGetWorkflowOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+
+        WorkflowsWorkflowDetailsLink.persist(
+            context=context,
+            task_instance=self,
+            location_id=self.location,
+            workflow_id=self.workflow_id,
+            project_id=self.project_id or hook.project_id,
+        )
+
         return Workflow.to_dict(workflow)
 
 
@@ -417,6 +461,7 @@ class WorkflowsCreateExecutionOperator(BaseOperator):
 
     template_fields: Sequence[str] = ("location", "workflow_id", "execution")
     template_fields_renderers = {"execution": "json"}
+    operator_extra_links = (WorkflowsExecutionLink(),)
 
     def __init__(
         self,
@@ -425,7 +470,7 @@ class WorkflowsCreateExecutionOperator(BaseOperator):
         execution: Dict,
         location: str,
         project_id: Optional[str] = None,
-        retry: Optional[Retry] = None,
+        retry: Union[Retry, _MethodDefault] = DEFAULT,
         timeout: Optional[float] = None,
         metadata: Sequence[Tuple[str, str]] = (),
         gcp_conn_id: str = "google_cloud_default",
@@ -458,6 +503,16 @@ class WorkflowsCreateExecutionOperator(BaseOperator):
         )
         execution_id = execution.name.split("/")[-1]
         self.xcom_push(context, key="execution_id", value=execution_id)
+
+        WorkflowsExecutionLink.persist(
+            context=context,
+            task_instance=self,
+            location_id=self.location,
+            workflow_id=self.workflow_id,
+            execution_id=execution_id,
+            project_id=self.project_id or hook.project_id,
+        )
+
         return Execution.to_dict(execution)
 
 
@@ -481,6 +536,7 @@ class WorkflowsCancelExecutionOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = ("location", "workflow_id", "execution_id")
+    operator_extra_links = (WorkflowsExecutionLink(),)
 
     def __init__(
         self,
@@ -489,7 +545,7 @@ class WorkflowsCancelExecutionOperator(BaseOperator):
         execution_id: str,
         location: str,
         project_id: Optional[str] = None,
-        retry: Optional[Retry] = None,
+        retry: Union[Retry, _MethodDefault] = DEFAULT,
         timeout: Optional[float] = None,
         metadata: Sequence[Tuple[str, str]] = (),
         gcp_conn_id: str = "google_cloud_default",
@@ -520,6 +576,16 @@ class WorkflowsCancelExecutionOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+
+        WorkflowsExecutionLink.persist(
+            context=context,
+            task_instance=self,
+            location_id=self.location,
+            workflow_id=self.workflow_id,
+            execution_id=self.execution_id,
+            project_id=self.project_id or hook.project_id,
+        )
+
         return Execution.to_dict(execution)
 
 
@@ -548,6 +614,7 @@ class WorkflowsListExecutionsOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = ("location", "workflow_id")
+    operator_extra_links = (WorkflowsWorkflowDetailsLink(),)
 
     def __init__(
         self,
@@ -556,7 +623,7 @@ class WorkflowsListExecutionsOperator(BaseOperator):
         location: str,
         start_date_filter: Optional[datetime] = None,
         project_id: Optional[str] = None,
-        retry: Optional[Retry] = None,
+        retry: Union[Retry, _MethodDefault] = DEFAULT,
         timeout: Optional[float] = None,
         metadata: Sequence[Tuple[str, str]] = (),
         gcp_conn_id: str = "google_cloud_default",
@@ -587,6 +654,14 @@ class WorkflowsListExecutionsOperator(BaseOperator):
             metadata=self.metadata,
         )
 
+        WorkflowsWorkflowDetailsLink.persist(
+            context=context,
+            task_instance=self,
+            location_id=self.location,
+            workflow_id=self.workflow_id,
+            project_id=self.project_id or hook.project_id,
+        )
+
         return [Execution.to_dict(e) for e in execution_iter if e.start_time > self.start_date_filter]
 
 
@@ -610,6 +685,7 @@ class WorkflowsGetExecutionOperator(BaseOperator):
     """
 
     template_fields: Sequence[str] = ("location", "workflow_id", "execution_id")
+    operator_extra_links = (WorkflowsExecutionLink(),)
 
     def __init__(
         self,
@@ -618,7 +694,7 @@ class WorkflowsGetExecutionOperator(BaseOperator):
         execution_id: str,
         location: str,
         project_id: Optional[str] = None,
-        retry: Optional[Retry] = None,
+        retry: Union[Retry, _MethodDefault] = DEFAULT,
         timeout: Optional[float] = None,
         metadata: Sequence[Tuple[str, str]] = (),
         gcp_conn_id: str = "google_cloud_default",
@@ -649,4 +725,14 @@ class WorkflowsGetExecutionOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
+
+        WorkflowsExecutionLink.persist(
+            context=context,
+            task_instance=self,
+            location_id=self.location,
+            workflow_id=self.workflow_id,
+            execution_id=self.execution_id,
+            project_id=self.project_id or hook.project_id,
+        )
+
         return Execution.to_dict(execution)

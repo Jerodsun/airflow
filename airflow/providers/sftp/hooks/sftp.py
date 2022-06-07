@@ -19,6 +19,7 @@
 import datetime
 import stat
 import warnings
+from fnmatch import fnmatch
 from typing import Any, Dict, List, Optional, Tuple
 
 import pysftp
@@ -322,10 +323,28 @@ class SFTPHook(SSHHook):
         return files, dirs, unknowns
 
     def test_connection(self) -> Tuple[bool, str]:
-        """Test the SFTP connection by checking if remote entity '/some/path' exists"""
+        """Test the SFTP connection by calling path with directory"""
         try:
             conn = self.get_conn()
             conn.pwd
             return True, "Connection successfully tested"
         except Exception as e:
             return False, str(e)
+
+    def get_file_by_pattern(self, path, fnmatch_pattern) -> str:
+        """
+        Returning the first matching file based on the given fnmatch type pattern
+
+        :param path: path to be checked
+        :param fnmatch_pattern: The pattern that will be matched with `fnmatch`
+        :return: string containing the first found file, or an empty string if none matched
+        """
+        files_list = self.list_directory(path)
+
+        for file in files_list:
+            if not fnmatch(file, fnmatch_pattern):
+                pass
+            else:
+                return file
+
+        return ""

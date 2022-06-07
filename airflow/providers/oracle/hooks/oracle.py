@@ -16,12 +16,17 @@
 # specific language governing permissions and limitations
 # under the License.
 
+import math
 import warnings
 from datetime import datetime
 from typing import Dict, List, Optional, Union
 
 import cx_Oracle
-import numpy
+
+try:
+    import numpy
+except ImportError:
+    numpy = None  # type: ignore
 
 from airflow.hooks.dbapi import DbApiHook
 
@@ -159,7 +164,8 @@ class OracleHook(DbApiHook):
         # if Connection.schema is defined, set schema after connecting successfully
         # cannot be part of conn_config
         # https://cx-oracle.readthedocs.io/en/latest/api_manual/connection.html?highlight=schema#Connection.current_schema
-        if schema is not None:
+        # Only set schema when not using conn.schema as Service Name
+        if schema and service_name:
             conn.current_schema = schema
 
         return conn
@@ -210,9 +216,9 @@ class OracleHook(DbApiHook):
                     lst.append("'" + str(cell).replace("'", "''") + "'")
                 elif cell is None:
                     lst.append('NULL')
-                elif isinstance(cell, float) and numpy.isnan(cell):  # coerce numpy NaN to NULL
+                elif isinstance(cell, float) and math.isnan(cell):  # coerce numpy NaN to NULL
                     lst.append('NULL')
-                elif isinstance(cell, numpy.datetime64):
+                elif numpy and isinstance(cell, numpy.datetime64):
                     lst.append("'" + str(cell) + "'")
                 elif isinstance(cell, datetime):
                     lst.append(
@@ -338,3 +344,18 @@ class OracleHook(DbApiHook):
         )
 
         return result
+
+    # TODO: Merge this implementation back to DbApiHook when dropping
+    # support for Airflow 2.2.
+    def test_connection(self):
+        """Tests the connection by executing a select 1 from dual query"""
+        status, message = False, ''
+        try:
+            if self.get_first("select 1 from dual"):
+                status = True
+                message = 'Connection successfully tested'
+        except Exception as e:
+            status = False
+            message = str(e)
+
+        return status, message

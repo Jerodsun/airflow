@@ -30,26 +30,27 @@ works.
 
 .. code-block:: python
 
-    from datetime import datetime, timedelta
+    import datetime
+    import pendulum
 
     from airflow.lineage import AUTO
     from airflow.lineage.entities import File
     from airflow.models import DAG
     from airflow.operators.bash import BashOperator
-    from airflow.operators.dummy import DummyOperator
+    from airflow.operators.empty import EmptyOperator
 
     FILE_CATEGORIES = ["CAT1", "CAT2", "CAT3"]
 
     dag = DAG(
         dag_id="example_lineage",
-        start_date=datetime(2021, 1, 1),
+        start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
         schedule_interval="0 0 * * *",
         catchup=False,
-        dagrun_timeout=timedelta(minutes=60),
+        dagrun_timeout=datetime.timedelta(minutes=60),
     )
 
     f_final = File(url="/tmp/final")
-    run_this_last = DummyOperator(
+    run_this_last = EmptyOperator(
         task_id="run_this_last", dag=dag, inlets=AUTO, outlets=f_final
     )
 

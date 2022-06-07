@@ -34,7 +34,7 @@ You can change the backend using the following config
 
 .. code-block:: ini
 
-    [core]
+    [database]
     sql_alchemy_conn = my_conn_string
 
 Once you have changed the backend, airflow needs to create all the tables required for operation.
@@ -93,7 +93,7 @@ e.g. metadata DB, password, etc. You can accomplish this using the format :envva
 
 .. code-block:: bash
 
- AIRFLOW__CORE__SQL_ALCHEMY_CONN=my_conn_id
+ AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=my_conn_id
  AIRFLOW__WEBSERVER__BASE_URL=http://host:port
 
 Some configurations such as the Airflow Backend connection URI can be derived from bash commands as well:

@@ -77,7 +77,6 @@ class EksCreateClusterOperator(BaseOperator):
     :param compute: The type of compute architecture to generate along with the cluster. (templated)
          Defaults to 'nodegroup' to generate an EKS Managed Nodegroup.
     :param create_cluster_kwargs: Optional parameters to pass to the CreateCluster API (templated)
-    :type: Dict
     :param aws_conn_id: The Airflow connection used for AWS credentials. (templated)
          If this is None or empty then the default boto3 behaviour is used. If
          running Airflow in a distributed manner and aws_conn_id is None or
@@ -92,7 +91,6 @@ class EksCreateClusterOperator(BaseOperator):
     :param nodegroup_role_arn: *REQUIRED* The Amazon Resource Name (ARN) of the IAM role to associate with
          the Amazon EKS managed node group. (templated)
     :param create_nodegroup_kwargs: Optional parameters to pass to the CreateNodegroup API (templated)
-    :type: Dict
 
 
     If compute is assigned the value of 'fargate':
@@ -103,7 +101,6 @@ class EksCreateClusterOperator(BaseOperator):
     :param fargate_selectors: The selectors to match for pods to use this AWS Fargate profile. (templated)
     :param create_fargate_profile_kwargs: Optional parameters to pass to the CreateFargateProfile API
          (templated)
-    :type: Dict
 
     """
 
@@ -142,20 +139,6 @@ class EksCreateClusterOperator(BaseOperator):
         region: Optional[str] = None,
         **kwargs,
     ) -> None:
-        if compute:
-            if compute not in SUPPORTED_COMPUTE_VALUES:
-                raise ValueError("Provided compute type is not supported.")
-            elif (compute == 'nodegroup') and not nodegroup_role_arn:
-                raise ValueError(
-                    MISSING_ARN_MSG.format(compute=NODEGROUP_FULL_NAME, requirement='nodegroup_role_arn')
-                )
-            elif (compute == 'fargate') and not fargate_pod_execution_role_arn:
-                raise ValueError(
-                    MISSING_ARN_MSG.format(
-                        compute=FARGATE_FULL_NAME, requirement='fargate_pod_execution_role_arn'
-                    )
-                )
-
         self.compute = compute
         self.cluster_name = cluster_name
         self.cluster_role_arn = cluster_role_arn
@@ -173,6 +156,20 @@ class EksCreateClusterOperator(BaseOperator):
         super().__init__(**kwargs)
 
     def execute(self, context: 'Context'):
+        if self.compute:
+            if self.compute not in SUPPORTED_COMPUTE_VALUES:
+                raise ValueError("Provided compute type is not supported.")
+            elif (self.compute == 'nodegroup') and not self.nodegroup_role_arn:
+                raise ValueError(
+                    MISSING_ARN_MSG.format(compute=NODEGROUP_FULL_NAME, requirement='nodegroup_role_arn')
+                )
+            elif (self.compute == 'fargate') and not self.fargate_pod_execution_role_arn:
+                raise ValueError(
+                    MISSING_ARN_MSG.format(
+                        compute=FARGATE_FULL_NAME, requirement='fargate_pod_execution_role_arn'
+                    )
+                )
+
         eks_hook = EksHook(
             aws_conn_id=self.aws_conn_id,
             region_name=self.region,
@@ -241,7 +238,6 @@ class EksCreateNodegroupOperator(BaseOperator):
     :param nodegroup_role_arn:
          The Amazon Resource Name (ARN) of the IAM role to associate with the managed nodegroup. (templated)
     :param create_nodegroup_kwargs: Optional parameters to pass to the Create Nodegroup API (templated)
-    :type: Dict
     :param aws_conn_id: The Airflow connection used for AWS credentials. (templated)
          If this is None or empty then the default boto3 behaviour is used. If
          running Airflow in a distributed manner and aws_conn_id is None or
@@ -279,23 +275,23 @@ class EksCreateNodegroupOperator(BaseOperator):
         self.create_nodegroup_kwargs = create_nodegroup_kwargs or {}
         self.aws_conn_id = aws_conn_id
         self.region = region
-        nodegroup_subnets_list: List[str] = []
-        if isinstance(nodegroup_subnets, str):
-            if nodegroup_subnets != "":
+        self.nodegroup_subnets = nodegroup_subnets
+        super().__init__(**kwargs)
+
+    def execute(self, context: 'Context'):
+        if isinstance(self.nodegroup_subnets, str):
+            nodegroup_subnets_list: List[str] = []
+            if self.nodegroup_subnets != "":
                 try:
-                    nodegroup_subnets_list = cast(List, literal_eval(nodegroup_subnets))
+                    nodegroup_subnets_list = cast(List, literal_eval(self.nodegroup_subnets))
                 except ValueError:
                     self.log.warning(
                         "The nodegroup_subnets should be List or string representing "
                         "Python list and is %s. Defaulting to []",
-                        nodegroup_subnets,
+                        self.nodegroup_subnets,
                     )
-        else:
-            nodegroup_subnets_list = nodegroup_subnets
-        self.nodegroup_subnets = nodegroup_subnets_list
-        super().__init__(**kwargs)
+            self.nodegroup_subnets = nodegroup_subnets_list
 
-    def execute(self, context: 'Context'):
         eks_hook = EksHook(
             aws_conn_id=self.aws_conn_id,
             region_name=self.region,
@@ -324,7 +320,6 @@ class EksCreateFargateProfileOperator(BaseOperator):
     :param fargate_profile_name: The unique name to give your AWS Fargate profile. (templated)
     :param create_fargate_profile_kwargs: Optional parameters to pass to the CreateFargate Profile API
      (templated)
-    :type: Dict
 
     :param aws_conn_id: The Airflow connection used for AWS credentials. (templated)
          If this is None or empty then the default boto3 behaviour is used. If

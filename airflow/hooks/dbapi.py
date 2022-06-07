@@ -18,7 +18,6 @@
 from contextlib import closing
 from datetime import datetime
 from typing import Any, Optional
-from urllib.parse import quote_plus, urlunsplit
 
 from sqlalchemy import create_engine
 
@@ -67,6 +66,8 @@ class DbApiHook(BaseHook):
     supports_autocommit = False
     # Override with the object that exposes the connect method
     connector = None  # type: Optional[ConnectorProtocol]
+    # Override with db-specific query to check connection
+    _test_connection_sql = "select 1"
 
     def __init__(self, *args, schema: Optional[str] = None, **kwargs):
         super().__init__()
@@ -96,14 +97,8 @@ class DbApiHook(BaseHook):
         :return: the extracted uri.
         """
         conn = self.get_connection(getattr(self, self.conn_name_attr))
-        login = ''
-        if conn.login:
-            login = f'{quote_plus(conn.login)}:{quote_plus(conn.password)}@'
-        host = conn.host
-        if conn.port is not None:
-            host += f':{conn.port}'
-        schema = self.__schema or conn.schema or ''
-        return urlunsplit((conn.conn_type, f'{login}{host}', schema, '', ''))
+        conn.schema = self.__schema or conn.schema
+        return conn.get_uri()
 
     def get_sqlalchemy_engine(self, engine_kwargs=None):
         """
@@ -132,6 +127,24 @@ class DbApiHook(BaseHook):
 
         with closing(self.get_conn()) as conn:
             return psql.read_sql(sql, con=conn, params=parameters, **kwargs)
+
+    def get_pandas_df_by_chunks(self, sql, parameters=None, *, chunksize, **kwargs):
+        """
+        Executes the sql and returns a generator
+
+        :param sql: the sql statement to be executed (str) or a list of
+            sql statements to execute
+        :param parameters: The parameters to render the SQL query with
+        :param chunksize: number of rows to include in  each chunk
+        :param kwargs: (optional) passed into pandas.io.sql.read_sql method
+        """
+        try:
+            from pandas.io import sql as psql
+        except ImportError:
+            raise Exception("pandas library not installed, run: pip install 'apache-airflow[pandas]'.")
+
+        with closing(self.get_conn()) as conn:
+            yield from psql.read_sql(sql, con=conn, params=parameters, chunksize=chunksize, **kwargs)
 
     def get_records(self, sql, parameters=None):
         """
@@ -182,6 +195,11 @@ class DbApiHook(BaseHook):
         scalar = isinstance(sql, str)
         if scalar:
             sql = [sql]
+
+        if sql:
+            self.log.debug("Executing %d statements", len(sql))
+        else:
+            raise ValueError("List of SQL statements is empty")
 
         with closing(self.get_conn()) as conn:
             if self.supports_autocommit:
@@ -346,10 +364,10 @@ class DbApiHook(BaseHook):
         raise NotImplementedError()
 
     def test_connection(self):
-        """Tests the connection by executing a select 1 query"""
+        """Tests the connection using db-specific query"""
         status, message = False, ''
         try:
-            if self.get_first("select 1"):
+            if self.get_first(self._test_connection_sql):
                 status = True
                 message = 'Connection successfully tested'
         except Exception as e:

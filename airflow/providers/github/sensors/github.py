@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 from github import GithubException
 
 from airflow import AirflowException
-from airflow.providers.github.operators.github import GithubOperator
+from airflow.providers.github.hooks.github import GithubHook
 from airflow.sensors.base import BaseSensorOperator
 
 if TYPE_CHECKING:
@@ -32,14 +32,10 @@ class GithubSensor(BaseSensorOperator):
     """
     Base GithubSensor which can monitor for any change.
 
-    :param github_conn_id: reference to a pre-defined Github Connection
-    :type github_conn_id: str
+    :param github_conn_id: reference to a pre-defined GitHub Connection
     :param method_name: method name from PyGithub to be executed
-    :type method_name: str
     :param method_params: parameters for the method method_name
-    :type method_params: dict
     :param result_processor: function that return boolean and act as a sensor response
-    :type result_processor: function
     """
 
     def __init__(
@@ -58,16 +54,15 @@ class GithubSensor(BaseSensorOperator):
             self.result_processor = result_processor
         self.method_name = method_name
         self.method_params = method_params
-        self.github_operator = GithubOperator(
-            task_id=self.task_id,
-            github_conn_id=self.github_conn_id,
-            github_method=self.method_name,
-            github_method_args=self.method_params,
-            result_processor=self.result_processor,
-        )
 
     def poke(self, context: 'Context') -> bool:
-        return self.github_operator.execute(context=context)
+        hook = GithubHook(github_conn_id=self.github_conn_id)
+        github_result = getattr(hook.client, self.method_name)(**self.method_params)
+
+        if self.result_processor:
+            return self.result_processor(github_result)
+
+        return github_result
 
 
 class BaseGithubRepositorySensor(GithubSensor):
@@ -75,9 +70,7 @@ class BaseGithubRepositorySensor(GithubSensor):
     Base GitHub sensor at Repository level.
 
     :param github_conn_id: reference to a pre-defined GitHub Connection
-    :type github_conn_id: str
     :param repository_name: full qualified name of the repository to be monitored, ex. "apache/airflow"
-    :type repository_name: str
     """
 
     def __init__(
@@ -108,12 +101,9 @@ class GithubTagSensor(BaseGithubRepositorySensor):
     """
     Monitors a github tag for its creation.
 
-    :param github_conn_id: reference to a pre-defined Github Connection
-    :type github_conn_id: str
+    :param github_conn_id: reference to a pre-defined GitHub Connection
     :param tag_name: name of the tag to be monitored
-    :type tag_name: str
     :param repository_name: fully qualified name of the repository to be monitored, ex. "apache/airflow"
-    :type repository_name: str
     """
 
     template_fields = ("tag_name",)
@@ -147,10 +137,10 @@ class GithubTagSensor(BaseGithubRepositorySensor):
                 all_tags = [x.name for x in repo.get_tags()]
                 result = self.tag_name in all_tags
 
-        except GithubException as github_error:
+        except GithubException as github_error:  # type: ignore[misc]
             raise AirflowException(f"Failed to execute GithubSensor, error: {str(github_error)}")
         except Exception as e:
-            raise AirflowException(f"Github operator error: {str(e)}")
+            raise AirflowException(f"GitHub operator error: {str(e)}")
 
         if result is True:
             self.log.info("Tag %s exists in %s repository, Success.", self.tag_name, self.repository_name)

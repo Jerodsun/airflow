@@ -50,7 +50,8 @@ class TestAthenaOperator(unittest.TestCase):
             'start_date': DEFAULT_DATE,
         }
 
-        self.dag = DAG(TEST_DAG_ID + 'test_schedule_dag_once', default_args=args, schedule_interval='@once')
+        self.dag = DAG(f'{TEST_DAG_ID}test_schedule_dag_once', default_args=args, schedule_interval='@once')
+
         self.athena = AthenaOperator(
             task_id='test_athena_operator',
             query='SELECT * FROM TEST_TABLE',
@@ -72,7 +73,7 @@ class TestAthenaOperator(unittest.TestCase):
 
         assert self.athena.hook.sleep_time == 0
 
-    @mock.patch.object(AthenaHook, 'check_query_status', side_effect=("SUCCESS",))
+    @mock.patch.object(AthenaHook, 'check_query_status', side_effect=("SUCCEEDED",))
     @mock.patch.object(AthenaHook, 'run_query', return_value=ATHENA_QUERY_ID)
     @mock.patch.object(AthenaHook, 'get_conn')
     def test_hook_run_small_success_query(self, mock_conn, mock_run_query, mock_check_query_status):
@@ -92,7 +93,7 @@ class TestAthenaOperator(unittest.TestCase):
         side_effect=(
             "RUNNING",
             "RUNNING",
-            "SUCCESS",
+            "SUCCEEDED",
         ),
     )
     @mock.patch.object(AthenaHook, 'run_query', return_value=ATHENA_QUERY_ID)
@@ -202,7 +203,7 @@ class TestAthenaOperator(unittest.TestCase):
         )
         assert mock_check_query_status.call_count == 3
 
-    @mock.patch.object(AthenaHook, 'check_query_status', side_effect=("SUCCESS",))
+    @mock.patch.object(AthenaHook, 'check_query_status', side_effect=("SUCCEEDED",))
     @mock.patch.object(AthenaHook, 'run_query', return_value=ATHENA_QUERY_ID)
     @mock.patch.object(AthenaHook, 'get_conn')
     def test_return_value(self, mock_conn, mock_run_query, mock_check_query_status):

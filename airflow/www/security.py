@@ -259,6 +259,38 @@ class AirflowSecurityManager(SecurityManager, LoggingMixin):
             user = g.user
         return user.roles
 
+    def get_readable_dags(self, user):
+        """Gets the DAGs readable by authenticated user."""
+        warnings.warn(
+            "`get_readable_dags` has been deprecated. Please use `get_readable_dag_ids` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            return self.get_accessible_dags([permissions.ACTION_CAN_READ], user)
+
+    def get_editable_dags(self, user):
+        """Gets the DAGs editable by authenticated user."""
+        warnings.warn(
+            "`get_editable_dags` has been deprecated. Please use `get_editable_dag_ids` instead.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            return self.get_accessible_dags([permissions.ACTION_CAN_EDIT], user)
+
+    @provide_session
+    def get_accessible_dags(self, user_actions, user, session=None):
+        warnings.warn(
+            "`get_accessible_dags` has been deprecated. Please use `get_accessible_dag_ids` instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        dag_ids = self.get_accessible_dag_ids(user, user_actions, session)
+        return session.query(DagModel).filter(DagModel.dag_id.in_(dag_ids))
+
     def get_readable_dag_ids(self, user) -> Set[str]:
         """Gets the DAG IDs readable by authenticated user."""
         return self.get_accessible_dag_ids(user, [permissions.ACTION_CAN_READ])
@@ -325,6 +357,11 @@ class AirflowSecurityManager(SecurityManager, LoggingMixin):
         dag_resource_name = permissions.resource_name_for_dag(dag_id)
         return self.has_access(permissions.ACTION_CAN_EDIT, dag_resource_name, user=user)
 
+    def can_delete_dag(self, dag_id, user=None) -> bool:
+        """Determines whether a user has DAG delete access."""
+        dag_resource_name = permissions.resource_name_for_dag(dag_id)
+        return self.has_access(permissions.ACTION_CAN_DELETE, dag_resource_name, user=user)
+
     def prefixed_dag_id(self, dag_id):
         """Returns the permission name for a DAG id."""
         warnings.warn(
@@ -344,7 +381,7 @@ class AirflowSecurityManager(SecurityManager, LoggingMixin):
     def has_access(self, action_name, resource_name, user=None) -> bool:
         """
         Verify whether a given user could perform a certain action
-        (e.g can_read, can_write) on the given resource.
+        (e.g can_read, can_write, can_delete) on the given resource.
 
         :param action_name: action_name on resource (e.g can_read, can_edit).
         :param resource_name: name of view-menu or resource.
@@ -479,8 +516,8 @@ class AirflowSecurityManager(SecurityManager, LoggingMixin):
 
     def create_dag_specific_permissions(self) -> None:
         """
-        Creates 'can_read' and 'can_edit' permissions for all DAGs,
-        along with any `access_control` permissions provided in them.
+        Creates 'can_read', 'can_edit', and 'can_delete' permissions for all
+        DAGs, along with any `access_control` permissions provided in them.
 
         This does iterate through ALL the DAGs, which can be slow. See `sync_perm_for_dag`
         if you only need to sync a single DAG.
@@ -647,6 +684,7 @@ class AirflowSecurityManager(SecurityManager, LoggingMixin):
             if perm in (
                 (permissions.ACTION_CAN_READ, permissions.RESOURCE_DAG),
                 (permissions.ACTION_CAN_EDIT, permissions.RESOURCE_DAG),
+                (permissions.ACTION_CAN_DELETE, permissions.RESOURCE_DAG),
             ):
                 can_access_all_dags = self.has_access(*perm)
                 if can_access_all_dags:

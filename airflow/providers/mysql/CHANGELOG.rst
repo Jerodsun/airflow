@@ -19,13 +19,63 @@ The version of MySQL server has to be 5.6.4+. The exact version upper bound depe
 on the version of ``mysqlclient`` package. For example, ``mysqlclient`` 1.3.12 can only be
 used with MySQL server 5.6.4 through 5.7.
 
+.. NOTE TO CONTRIBUTORS:
+   Please, only add notes to the Changelog just below the "Changelog" header when there are some breaking changes
+   and you want to add an explanation to the users on how they are supposed to deal with them.
+   The changelog is updated and maintained semi-automatically by release manager.
+
 Changelog
 ---------
+
+3.0.0
+.....
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+* This release of provider is only available for Airflow 2.2+ as explained in the Apache Airflow
+  providers support policy https://github.com/apache/airflow/blob/main/README.md#support-for-providers
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Add explanatory note for contributors about updating Changelog (#24229)``
+   * ``Migrate MySQL example DAGs to new design #22453 (#24142)``
+   * ``Prepare docs for May 2022 provider's release (#24231)``
+
+2.2.3
+.....
+
+Bug Fixes
+~~~~~~~~~
+
+* ``Fix mistakenly added install_requires for all providers (#22382)``
+
+2.2.2
+.....
+
+Misc
+~~~~~
+
+* ``Add Trove classifiers in PyPI (Framework :: Apache Airflow :: Provider)``
+
+2.2.1
+.....
+
+Misc
+~~~~
+
+* ``Support for Python 3.10``
+* ``Make DbApiHook use get_uri from Connection (#21764)``
+* ``Update MySqlOperator example dag (#21434)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
 
 2.2.0
 .....
 
 * ``Add more SQL template fields renderers (#21237)``
+* ``Add conditional 'template_fields_renderers' check for new SQL lexers (#21403)``
 
 Misc
 ~~~~
@@ -45,6 +95,7 @@ Misc
    * ``More f-strings (#18855)``
    * ``Update documentation for September providers release (#18613)``
    * ``Static start_date and default arg cleanup for misc. provider example DAGs (#18597)``
+   * ``Add documentation for January 2021 providers release (#21257)``
 
 2.1.1
 .....

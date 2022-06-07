@@ -40,11 +40,13 @@ TEST_DAG_FOLDER = os.environ['AIRFLOW__CORE__DAGS_FOLDER']
 
 DEFAULT_DATE = timezone.datetime(2016, 1, 1)
 
+TASK_FORMAT = '{{%(filename)s:%(lineno)d}} %(levelname)s - %(message)s'
+
 LOGGING_CONFIG = {
     'version': 1,
     'disable_existing_loggers': False,
     'formatters': {
-        'airflow.task': {'format': '[%(asctime)s] {{%(filename)s:%(lineno)d}} %(levelname)s - %(message)s'},
+        'airflow.task': {'format': TASK_FORMAT},
     },
     'handlers': {
         'console': {
@@ -200,14 +202,15 @@ class TestStandardTaskRunner:
         with create_session() as session:
             dag.create_dagrun(
                 run_id="test",
+                data_interval=(DEFAULT_DATE, DEFAULT_DATE),
                 state=State.RUNNING,
-                execution_date=DEFAULT_DATE,
                 start_date=DEFAULT_DATE,
                 session=session,
             )
-            ti = TaskInstance(task=task, execution_date=DEFAULT_DATE)
+            ti = TaskInstance(task=task, run_id="test")
             job1 = LocalTaskJob(task_instance=ti, ignore_ti_state=True)
             session.commit()
+            ti.refresh_from_task(task)
 
             runner = StandardTaskRunner(job1)
             runner.start()
@@ -232,6 +235,8 @@ class TestStandardTaskRunner:
             logging.info(f"Terminating processes {processes} belonging to {runner_pgid} group")
             runner.terminate()
             session.close()  # explicitly close as `create_session`s commit will blow up otherwise
+
+        ti.refresh_from_db()
 
         logging.info("Waiting for the on kill killed file to appear")
         with timeout(seconds=4):

@@ -69,7 +69,7 @@ class HiveOperator(BaseOperator):
         '.hql',
         '.sql',
     )
-    template_fields_renderers = {'sql': 'hql'}
+    template_fields_renderers = {'hql': 'hql'}
     ui_color = '#f0e4ec'
 
     def __init__(
@@ -100,11 +100,15 @@ class HiveOperator(BaseOperator):
         self.mapred_queue = mapred_queue
         self.mapred_queue_priority = mapred_queue_priority
         self.mapred_job_name = mapred_job_name
-        self.mapred_job_name_template = conf.get(
+
+        job_name_template = conf.get(
             'hive',
             'mapred_job_name_template',
             fallback="Airflow HiveOperator task for {hostname}.{dag_id}.{task_id}.{execution_date}",
         )
+        if job_name_template is None:
+            raise ValueError("Job name template should be set !")
+        self.mapred_job_name_template: str = job_name_template
 
         # assigned lazily - just for consistency we can create the attribute with a
         # `None` initial value, later it will be populated by the execute method.

@@ -41,7 +41,7 @@ Content
     :maxdepth: 1
     :caption: Resources
 
-    Example DAGs <https://github.com/apache/airflow/tree/main/airflow/providers/microsoft/azure/example_dags>
+    Example DAGs <https://github.com/apache/airflow/tree/main/tests/system/providers/microsoft/azure>
     PyPI Repository <https://pypi.org/project/apache-airflow-providers-microsoft-azure/>
     Installing from sources <installing-providers-from-sources>
 
@@ -61,7 +61,7 @@ Package apache-airflow-providers-microsoft-azure
 `Microsoft Azure <https://azure.microsoft.com/>`__
 
 
-Release: 3.6.0
+Release: 4.0.0
 
 Provider package
 ----------------
@@ -72,21 +72,22 @@ are in ``airflow.providers.microsoft.azure`` python package.
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2.1+ installation via
+You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
+for the minimum Airflow version supported) via
 ``pip install apache-airflow-providers-microsoft-azure``
 
-PIP requirements
-----------------
+Requirements
+------------
 
 ================================  ====================
 PIP package                       Version required
 ================================  ====================
-``apache-airflow``                ``>=2.1.0``
+``apache-airflow``                ``>=2.2.0``
 ``azure-batch``                   ``>=8.0.0``
-``azure-cosmos``                  ``>=4.0.0,<5``
+``azure-cosmos``                  ``>=4.0.0``
 ``azure-datalake-store``          ``>=0.0.45``
 ``azure-identity``                ``>=1.3.1``
-``azure-keyvault``                ``>=4.1.0``
+``azure-keyvault-secrets``        ``>=4.1.0,<5.0``
 ``azure-kusto-data``              ``>=0.0.43,<0.1``
 ``azure-mgmt-containerinstance``  ``>=1.5.0,<2.0``
 ``azure-mgmt-datafactory``        ``>=1.0.0,<2.0``
@@ -124,7 +125,7 @@ Downloading official packages
 You can download officially released packages and verify their checksums and signatures from the
 `Official Apache Download site <https://downloads.apache.org/airflow/providers/>`_
 
-* `The apache-airflow-providers-microsoft-azure 3.6.0 sdist package <https://downloads.apache.org/airflow/providers/apache-airflow-providers-microsoft-azure-3.6.0.tar.gz>`_ (`asc <https://downloads.apache.org/airflow/providers/apache-airflow-providers-microsoft-azure-3.6.0.tar.gz.asc>`__, `sha512 <https://downloads.apache.org/airflow/providers/apache-airflow-providers-microsoft-azure-3.6.0.tar.gz.sha512>`__)
-* `The apache-airflow-providers-microsoft-azure 3.6.0 wheel package <https://downloads.apache.org/airflow/providers/apache_airflow_providers_microsoft_azure-3.6.0-py3-none-any.whl>`_ (`asc <https://downloads.apache.org/airflow/providers/apache_airflow_providers_microsoft_azure-3.6.0-py3-none-any.whl.asc>`__, `sha512 <https://downloads.apache.org/airflow/providers/apache_airflow_providers_microsoft_azure-3.6.0-py3-none-any.whl.sha512>`__)
+* `The apache-airflow-providers-microsoft-azure 4.0.0 sdist package <https://downloads.apache.org/airflow/providers/apache-airflow-providers-microsoft-azure-4.0.0.tar.gz>`_ (`asc <https://downloads.apache.org/airflow/providers/apache-airflow-providers-microsoft-azure-4.0.0.tar.gz.asc>`__, `sha512 <https://downloads.apache.org/airflow/providers/apache-airflow-providers-microsoft-azure-4.0.0.tar.gz.sha512>`__)
+* `The apache-airflow-providers-microsoft-azure 4.0.0 wheel package <https://downloads.apache.org/airflow/providers/apache_airflow_providers_microsoft_azure-4.0.0-py3-none-any.whl>`_ (`asc <https://downloads.apache.org/airflow/providers/apache_airflow_providers_microsoft_azure-4.0.0-py3-none-any.whl.asc>`__, `sha512 <https://downloads.apache.org/airflow/providers/apache_airflow_providers_microsoft_azure-4.0.0-py3-none-any.whl.sha512>`__)
 
 .. include:: ../../airflow/providers/microsoft/azure/CHANGELOG.rst

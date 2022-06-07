@@ -21,13 +21,14 @@ from unittest import mock
 from unittest.mock import call
 
 import pytest
+from docker.constants import DEFAULT_TIMEOUT_SECONDS
 from docker.errors import APIError
 
 from airflow.exceptions import AirflowException
 
 try:
     from docker import APIClient
-    from docker.types import Mount
+    from docker.types import DeviceRequest, Mount
 
     from airflow.providers.docker.hooks.docker import DockerHook
     from airflow.providers.docker.operators.docker import DockerOperator
@@ -50,12 +51,14 @@ class TestDockerOperator(unittest.TestCase):
         self.client_mock.pull.return_value = {"status": "pull log"}
         self.client_mock.wait.return_value = {"StatusCode": 0}
         self.client_mock.create_host_config.return_value = mock.Mock()
-        self.log_messages = ['container log 1', 'container log 2']
+        self.log_messages = ['container log  😁   ', b'byte string container log']
         self.client_mock.attach.return_value = self.log_messages
 
         # If logs() is called with tail then only return the last value, otherwise return the whole log.
         self.client_mock.logs.side_effect = (
-            lambda **kwargs: self.log_messages[-kwargs['tail']] if 'tail' in kwargs else self.log_messages
+            lambda **kwargs: iter(self.log_messages[-kwargs['tail'] :])
+            if 'tail' in kwargs
+            else iter(self.log_messages)
         )
 
         self.client_class_patcher = mock.patch(
@@ -85,11 +88,12 @@ class TestDockerOperator(unittest.TestCase):
             host_tmp_dir='/host/airflow',
             container_name='test_container',
             tty=True,
+            device_requests=[DeviceRequest(count=-1, capabilities=[['gpu']])],
         )
         operator.execute(None)
 
         self.client_class_mock.assert_called_once_with(
-            base_url='unix://var/run/docker.sock', tls=None, version='1.19'
+            base_url='unix://var/run/docker.sock', tls=None, version='1.19', timeout=DEFAULT_TIMEOUT_SECONDS
         )
 
         self.client_mock.create_container.assert_called_once_with(
@@ -118,6 +122,7 @@ class TestDockerOperator(unittest.TestCase):
             cap_add=None,
             extra_hosts=None,
             privileged=False,
+            device_requests=[DeviceRequest(count=-1, capabilities=[['gpu']])],
         )
         self.tempdir_mock.assert_called_once_with(dir='/host/airflow', prefix='airflowtmp')
         self.client_mock.images.assert_called_once_with(name='ubuntu:latest')
@@ -155,7 +160,7 @@ class TestDockerOperator(unittest.TestCase):
         operator.execute(None)
 
         self.client_class_mock.assert_called_once_with(
-            base_url='unix://var/run/docker.sock', tls=None, version='1.19'
+            base_url='unix://var/run/docker.sock', tls=None, version='1.19', timeout=DEFAULT_TIMEOUT_SECONDS
         )
 
         self.client_mock.create_container.assert_called_once_with(
@@ -183,6 +188,7 @@ class TestDockerOperator(unittest.TestCase):
             cap_add=None,
             extra_hosts=None,
             privileged=False,
+            device_requests=None,
         )
         self.tempdir_mock.assert_not_called()
         self.client_mock.images.assert_called_once_with(name='ubuntu:latest')
@@ -228,7 +234,7 @@ class TestDockerOperator(unittest.TestCase):
                 "and mounting temporary volume from host is not supported" in captured.output[0]
             )
         self.client_class_mock.assert_called_once_with(
-            base_url='unix://var/run/docker.sock', tls=None, version='1.19'
+            base_url='unix://var/run/docker.sock', tls=None, version='1.19', timeout=DEFAULT_TIMEOUT_SECONDS
         )
         self.client_mock.create_container.assert_has_calls(
             [
@@ -273,6 +279,7 @@ class TestDockerOperator(unittest.TestCase):
                     cap_add=None,
                     extra_hosts=None,
                     privileged=False,
+                    device_requests=None,
                 ),
                 call(
                     mounts=[
@@ -288,6 +295,7 @@ class TestDockerOperator(unittest.TestCase):
                     cap_add=None,
                     extra_hosts=None,
                     privileged=False,
+                    device_requests=None,
                 ),
             ]
         )
@@ -338,7 +346,7 @@ class TestDockerOperator(unittest.TestCase):
         )
 
         self.client_class_mock.assert_called_once_with(
-            base_url='https://127.0.0.1:2376', tls=tls_mock, version=None
+            base_url='https://127.0.0.1:2376', tls=tls_mock, version=None, timeout=DEFAULT_TIMEOUT_SECONDS
         )
 
     def test_execute_unicode_logs(self):
@@ -429,6 +437,45 @@ class TestDockerOperator(unittest.TestCase):
 
     def test_execute_xcom_behavior(self):
         self.client_mock.pull.return_value = [b'{"status":"pull log"}']
+        kwargs = {
+            'api_version': '1.19',
+            'command': 'env',
+            'environment': {'UNIT': 'TEST'},
+            'private_environment': {'PRIVATE': 'MESSAGE'},
+            'image': 'ubuntu:latest',
+            'network_mode': 'bridge',
+            'owner': 'unittest',
+            'task_id': 'unittest',
+            'mounts': [Mount(source='/host/path', target='/container/path', type='bind')],
+            'working_dir': '/container/path',
+            'shm_size': 1000,
+            'host_tmp_dir': '/host/airflow',
+            'container_name': 'test_container',
+            'tty': True,
+        }
+
+        xcom_push_operator = DockerOperator(**kwargs, do_xcom_push=True, xcom_all=False)
+        xcom_all_operator = DockerOperator(**kwargs, do_xcom_push=True, xcom_all=True)
+        no_xcom_push_operator = DockerOperator(**kwargs, do_xcom_push=False)
+
+        xcom_push_result = xcom_push_operator.execute(None)
+        xcom_all_result = xcom_all_operator.execute(None)
+        no_xcom_push_result = no_xcom_push_operator.execute(None)
+
+        assert xcom_push_result == 'byte string container log'
+        assert xcom_all_result == ['container log  😁', 'byte string container log']
+        assert no_xcom_push_result is None
+
+    def test_execute_xcom_behavior_bytes(self):
+        self.log_messages = [b'container log 1 ', b'container log 2']
+        self.client_mock.pull.return_value = [b'{"status":"pull log"}']
+        self.client_mock.attach.return_value = iter([b'container log 1 ', b'container log 2'])
+        # Make sure the logs side effect is updated after the change
+        self.client_mock.logs.side_effect = (
+            lambda **kwargs: iter(self.log_messages[-kwargs['tail'] :])
+            if 'tail' in kwargs
+            else iter(self.log_messages)
+        )
 
         kwargs = {
             'api_version': '1.19',
@@ -455,13 +502,18 @@ class TestDockerOperator(unittest.TestCase):
         xcom_all_result = xcom_all_operator.execute(None)
         no_xcom_push_result = no_xcom_push_operator.execute(None)
 
+        # Those values here are different than log above as they are from setup
         assert xcom_push_result == 'container log 2'
         assert xcom_all_result == ['container log 1', 'container log 2']
         assert no_xcom_push_result is None
 
-    def test_execute_xcom_behavior_bytes(self):
+    def test_execute_xcom_behavior_no_result(self):
+        self.log_messages = []
         self.client_mock.pull.return_value = [b'{"status":"pull log"}']
-        self.client_mock.attach.return_value = [b'container log 1 ', b'container log 2']
+        self.client_mock.attach.return_value = iter([])
+        # Make sure the logs side effect is updated after the change
+        self.client_mock.logs.side_effect = iter([])
+
         kwargs = {
             'api_version': '1.19',
             'command': 'env',
@@ -487,8 +539,8 @@ class TestDockerOperator(unittest.TestCase):
         xcom_all_result = xcom_all_operator.execute(None)
         no_xcom_push_result = no_xcom_push_operator.execute(None)
 
-        assert xcom_push_result == 'container log 2'
-        assert xcom_all_result == ['container log 1', 'container log 2']
+        assert xcom_push_result is None
+        assert xcom_all_result is None
         assert no_xcom_push_result is None
 
     def test_extra_hosts(self):

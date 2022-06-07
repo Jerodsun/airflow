@@ -22,7 +22,7 @@ from unittest import mock
 import pytest
 
 from airflow.models import DagBag, DagRun, Log, TaskInstance
-from airflow.utils import dates, timezone
+from airflow.utils import timezone
 from airflow.utils.state import State
 from airflow.utils.types import DagRunType
 from airflow.www import app
@@ -30,7 +30,7 @@ from airflow.www.views import action_has_dag_edit_access
 from tests.test_utils.db import clear_db_runs
 from tests.test_utils.www import check_content_in_response
 
-EXAMPLE_DAG_DEFAULT_DATE = dates.days_ago(2)
+EXAMPLE_DAG_DEFAULT_DATE = timezone.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 @pytest.fixture(scope="module")
@@ -115,7 +115,7 @@ def _check_last_log(session, dag_id, event, execution_date):
 
 def test_action_logging_get(session, admin_client):
     url = (
-        f'graph?dag_id=example_bash_operator&'
+        f'dags/example_bash_operator/graph?'
         f'execution_date={urllib.parse.quote_plus(str(EXAMPLE_DAG_DEFAULT_DATE))}'
     )
     resp = admin_client.get(url, follow_redirects=True)
@@ -127,6 +127,24 @@ def test_action_logging_get(session, admin_client):
         session,
         dag_id="example_bash_operator",
         event="graph",
+        execution_date=EXAMPLE_DAG_DEFAULT_DATE,
+    )
+
+
+def test_action_logging_get_legacy_view(session, admin_client):
+    url = (
+        f'graph?dag_id=example_bash_operator&'
+        f'execution_date={urllib.parse.quote_plus(str(EXAMPLE_DAG_DEFAULT_DATE))}'
+    )
+    resp = admin_client.get(url, follow_redirects=True)
+    check_content_in_response('runme_1', resp)
+
+    # In mysql backend, this commit() is needed to write down the logs
+    session.commit()
+    _check_last_log(
+        session,
+        dag_id="example_bash_operator",
+        event="legacy_graph",
         execution_date=EXAMPLE_DAG_DEFAULT_DATE,
     )
 

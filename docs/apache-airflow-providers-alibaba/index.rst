@@ -27,6 +27,7 @@ Content
 
     Connection types <connections/alibaba>
     Operators <operators/index>
+    Logging for Tasks <logging/index>
 
 .. toctree::
     :maxdepth: 1
@@ -38,7 +39,7 @@ Content
     :maxdepth: 1
     :caption: Resources
 
-    Example DAGs <https://github.com/apache/airflow/tree/main/airflow/providers/alibaba/cloud/example_dags>
+    Example DAGs <https://github.com/apache/airflow/tree/main/tests/system/providers/alibaba>
     PyPI Repository <https://pypi.org/project/apache-airflow-providers-alibaba/>
     Installing from sources <installing-providers-from-sources>
 
@@ -58,7 +59,7 @@ Package apache-airflow-providers-alibaba
 Alibaba Cloud integration (including `Alibaba Cloud <https://www.alibabacloud.com//>`__).
 
 
-Release: 1.1.0
+Release: 2.0.0
 
 Provider package
 ----------------
@@ -69,16 +70,17 @@ are in ``airflow.providers.alibaba`` python package.
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2.1+ installation via
+You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
+for the minimum Airflow version supported) via
 ``pip install apache-airflow-providers-alibaba``
 
-PIP requirements
-----------------
+Requirements
+------------
 
 ==================  ==================
 PIP package         Version required
 ==================  ==================
-``apache-airflow``  ``>=2.1.0``
+``apache-airflow``  ``>=2.2.0``
 ``oss2``            ``>=2.14.0``
 ==================  ==================
 

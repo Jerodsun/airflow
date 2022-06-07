@@ -17,80 +17,48 @@
 
 .. _howto/operator:RedshiftSQLOperator:
 
-RedshiftSQLOperator
+===============
+Amazon Redshift
+===============
+
+`Amazon Redshift <https://aws.amazon.com/redshift/>`__ manages all the work of setting up, operating, and scaling a data warehouse:
+provisioning capacity, monitoring and backing up the cluster, and applying patches and upgrades to
+the Amazon Redshift engine. You can focus on using your data to acquire new insights for your
+business and customers.
+
+Prerequisite Tasks
+------------------
+
+.. include:: _partials/prerequisite_tasks.rst
+
+Operators
+---------
+
+Execute a SQL query
 ===================
 
-.. contents::
-  :depth: 1
-  :local:
+``RedshiftSQLOperator`` executes a SQL query against an Amazon Redshift cluster using a Postgres connection.
 
-Overview
---------
+To execute a SQL query against an Amazon Redshift cluster without using a Postgres connection,
+please check ``RedshiftDataOperator``.
 
-Use the :class:`RedshiftSQLOperator <airflow.providers.amazon.aws.operators.redshift_sql>` to execute
-statements against an Amazon Redshift cluster.
-
-:class:`RedshiftSQLOperator <airflow.providers.amazon.aws.operators.redshift_sql.RedshiftSQLOperator>` works together with
-:class:`RedshiftSQLHook <airflow.providers.amazon.aws.hooks.redshift.RedshiftSQLHook>` to establish
-connections with Amazon Redshift.
-
-
-example_redshift.py
--------------------
-
-Purpose
-"""""""
-
-This is a basic example dag for using :class:`RedshiftSQLOperator <airflow.providers.amazon.aws.operators.redshift_sql>`
-to execute statements against an Amazon Redshift cluster.
-
-Create a table
-""""""""""""""
-
-In the following code we are creating a table called "fruit".
-
-.. exampleinclude:: /../../airflow/providers/amazon/aws/example_dags/example_redshift.py
+.. exampleinclude:: /../../airflow/providers/amazon/aws/example_dags/example_redshift_sql.py
     :language: python
-    :start-after: [START howto_operator_redshift_create_table]
-    :end-before: [END howto_operator_redshift_create_table]
+    :dedent: 4
+    :start-after: [START howto_operator_redshift_sql]
+    :end-before: [END howto_operator_redshift_sql]
 
-Insert data into a table
-""""""""""""""""""""""""
-
-In the following code we insert a few sample rows into the "fruit" table.
-
-.. exampleinclude:: /../../airflow/providers/amazon/aws/example_dags/example_redshift.py
-    :language: python
-    :start-after: [START howto_operator_redshift_populate_table]
-    :end-before: [END howto_operator_redshift_populate_table]
-
-Fetching records from a table
-"""""""""""""""""""""""""""""
-
-Creating a new table, "more_fruit" from the "fruit" table.
-
-.. exampleinclude:: /../../airflow/providers/amazon/aws/example_dags/example_redshift.py
-    :language: python
-    :start-after: [START howto_operator_redshift_get_all_rows]
-    :end-before: [END howto_operator_redshift_get_all_rows]
-
-Passing Parameters into RedshiftSQLOperator
-"""""""""""""""""""""""""""""""""""""""""""
-
-RedshiftSQLOperator supports the ``parameters`` attribute which allows us to dynamically pass
+``RedshiftSQLOperator`` supports the ``parameters`` attribute which allows us to dynamically pass
 parameters into SQL statements.
 
-.. exampleinclude:: /../../airflow/providers/amazon/aws/example_dags/example_redshift.py
+.. exampleinclude:: /../../airflow/providers/amazon/aws/example_dags/example_redshift_sql.py
     :language: python
-    :start-after: [START howto_operator_redshift_get_with_filter]
-    :end-before: [END howto_operator_redshift_get_with_filter]
+    :dedent: 4
+    :start-after: [START howto_operator_redshift_sql_with_params]
+    :end-before: [END howto_operator_redshift_sql_with_params]
 
-The complete RedshiftSQLOperator DAG
-------------------------------------
+Reference
+---------
 
-All together, here is our DAG:
-
-.. exampleinclude:: /../../airflow/providers/amazon/aws/example_dags/example_redshift.py
-    :language: python
-    :start-after: [START redshift_operator_howto_guide]
-    :end-before: [END redshift_operator_howto_guide]
+* `AWS boto3 library documentation for Amazon Redshift <https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/redshift.html>`__
+* `Amazon Redshift Python connector <https://docs.aws.amazon.com/redshift/latest/mgmt/python-connect-examples.html>`__

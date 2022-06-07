@@ -16,8 +16,217 @@
     under the License.
 
 
+.. NOTE TO CONTRIBUTORS:
+   Please, only add notes to the Changelog just below the "Changelog" header when there are some breaking changes
+   and you want to add an explanation to the users on how they are supposed to deal with them.
+   The changelog is updated and maintained semi-automatically by release manager.
+
 Changelog
 ---------
+
+4.0.0
+.....
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+* This release of provider is only available for Airflow 2.2+ as explained in the Apache Airflow
+  providers support policy https://github.com/apache/airflow/blob/main/README.md#support-for-providers
+
+Features
+~~~~~~~~
+
+* ``Add partition related methods to GlueCatalogHook: (#23857)``
+* ``Add support for associating  custom tags to job runs submitted via EmrContainerOperator (#23769)``
+* ``Add number of node params only for single-node cluster in RedshiftCreateClusterOperator (#23839)``
+
+Bug Fixes
+~~~~~~~~~
+
+* ``fix: StepFunctionHook ignores explicit set 'region_name' (#23976)``
+* ``Fix Amazon EKS example DAG raises warning during Imports (#23849)``
+* ``Move string arg evals to 'execute()' in 'EksCreateClusterOperator' (#23877)``
+
+Misc
+~~~~
+
+* ``Light Refactor and Clean-up AWS Provider (#23907)``
+* ``Update sample dag and doc for RDS (#23651)``
+* ``Reformat the whole AWS documentation (#23810)``
+* ``Replace "absolute()" with "resolve()" in pathlib objects (#23675)``
+* ``Apply per-run log templates to log handlers (#24153)``
+* ``Refactor GlueJobHook get_or_create_glue_job method. (#24215)``
+* ``Update the DMS Sample DAG and Docs (#23681)``
+* ``Update doc and sample dag for Quicksight (#23653)``
+* ``Update doc and sample dag for EMR Containers (#24087)``
+* ``Add AWS project structure tests (re: AIP-47) (#23630)``
+* ``Add doc and sample dag for GCSToS3Operator (#23730)``
+* ``Remove old Athena Sample DAG (#24170)``
+* ``Clean up f-strings in logging calls (#23597)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Add explanatory note for contributors about updating Changelog (#24229)``
+   * ``Introduce 'flake8-implicit-str-concat' plugin to static checks (#23873)``
+   * ``pydocstyle D202 added (#24221)``
+   * ``Prepare docs for May 2022 provider's release (#24231)``
+
+3.4.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add Quicksight create ingestion Hook and Operator (#21863)``
+* ``Add default 'aws_conn_id' to SageMaker Operators #21808 (#23515)``
+* ``Add RedshiftCreateClusterOperator``
+* ``Add 'S3CreateObjectOperator' (#22758)``
+* ``Add 'RedshiftDeleteClusterOperator' support (#23563)``
+
+Bug Fixes
+~~~~~~~~~
+
+* ``Fix conn close error on retrieving log events (#23470)``
+* ``Fix LocalFilesystemToS3Operator and S3CreateObjectOperator to support full s3:// style keys (#23180)``
+* ``Fix attempting to reattach in 'ECSOperator' (#23370)``
+* ``Fix doc build failure on main (#23240)``
+* ``Fix "Chain not supported for different length Iterable"``
+* ``'S3Hook': fix 'load_bytes' docstring (#23182)``
+* ``Deprecate 'S3PrefixSensor' and 'S3KeySizeSensor' in favor of 'S3KeySensor' (#22737)``
+* ``Allow back script_location in Glue to be None (#23357)``
+
+Misc
+~~~~
+
+* ``Add doc and example dag for Amazon SQS Operators (#23312)``
+* ``Add doc and sample dag for S3CopyObjectOperator and S3DeleteObjectsOperator (#22959)``
+* ``Add sample dag and doc for S3KeysUnchangedSensor``
+* ``Add doc and sample dag for S3FileTransformOperator``
+* ``Add doc and example dag for AWS Step Functions Operators``
+* ``Add sample dag and doc for S3ListOperator (#23449)``
+* ``Add doc and sample dag for EC2 (#23547)``
+* ``Add sample dag and doc for S3ListPrefixesOperator (#23448)``
+* ``Amazon Sagemaker Sample DAG and docs update (#23256)``
+* ``Update the Athena Sample DAG and Docs (#23428)``
+* ``Update sample dag and doc for Datasync (#23511)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Fix new MyPy errors in main (#22884)``
+   * ``Clean up in-line f-string concatenation (#23591)``
+   * ``Update docs Amazon Glacier Docs (#23372)``
+   * ``Bump pre-commit hook versions (#22887)``
+   * ``Use new Breese for building, pulling and verifying the images. (#23104)``
+
+
+3.3.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Pass custom headers through in SES email backend (#22667)``
+* ``Update secrets backends to use get_conn_value instead of get_conn_uri (#22348)``
+
+
+Misc
+~~~~
+
+* ``Add doc and sample dag for SqlToS3Operator (#22603)``
+* ``Adds HiveToDynamoDB Transfer Sample DAG and Docs (#22517)``
+* ``Add doc and sample dag for MongoToS3Operator (#22575)``
+* ``Add doc for LocalFilesystemToS3Operator (#22574)``
+* ``Add doc and example dag for AWS CloudFormation Operators (#22533)``
+* ``Add doc and sample dag for S3ToFTPOperator and FTPToS3Operator (#22534)``
+* ``GoogleApiToS3Operator: update sample dag and doc (#22507)``
+* ``SalesforceToS3Operator: update sample dag and doc (#22489)``
+
+
+3.2.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add arguments to filter list: start_after_key, from_datetime, to_datetime, object_filter callable (#22231)``
+
+Bug Fixes
+~~~~~~~~~
+
+* ``Fix mistakenly added install_requires for all providers (#22382)``
+* ``ImapAttachmentToS3Operator: fix it, update sample dag and update doc (#22351)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Update sample dag and doc for S3CreateBucketOperator, S3PutBucketTaggingOperator, S3GetBucketTaggingOperator, S3DeleteBucketTaggingOperator, S3DeleteBucketOperator (#22312)``
+   * ``Add docs and example dag for AWS Glue (#22295)``
+   * ``Update doc and sample dag for S3ToSFTPOperator and SFTPToS3Operator (#22313)``
+
+3.1.1
+.....
+
+Features
+~~~~~~~~
+
+* ``Added AWS RDS sensors (#21231)``
+* ``Added AWS RDS operators (#20907)``
+* ``Add RedshiftDataHook (#19137)``
+* ``Feature: Add invoke lambda function operator (#21686)``
+* ``Add JSON output on SqlToS3Operator (#21779)``
+* ``Add SageMakerDeleteModelOperator (#21673)``
+* ``Added Hook for Amazon RDS. Added 'boto3_stub' library for autocomplete. (#20642)``
+* ``Added SNS example DAG and rst (#21475)``
+* ``retry on very specific eni provision failures (#22002)``
+* ``Configurable AWS Session Factory (#21778)``
+* ``S3KeySensor to use S3Hook url parser (#21500)``
+* ``Get log events after sleep to get all logs (#21574)``
+* ``Use temporary file in GCSToS3Operator (#21295)``
+
+Bug Fixes
+~~~~~~~~~
+
+* ``AWS RDS integration fixes (#22125)``
+* ``Fix the Type Hints in ''RedshiftSQLOperator'' (#21885)``
+* ``Bug Fix - S3DeleteObjectsOperator will try and delete all keys (#21458)``
+* ``Fix Amazon SES emailer signature (#21681)``
+* ``Fix EcsOperatorError, so it can be loaded from a picklefile (#21441)``
+* ``Fix RedshiftDataOperator and update doc (#22157)``
+* ``Bugfix for retrying on provision failuers(#22137)``
+* ``If uploading task logs to S3 fails, retry once (#21981)``
+* ``Bug-fix GCSToS3Operator (#22071)``
+* ``fixes query status polling logic (#21423)``
+* ``use different logger to avoid duplicate log entry (#22256)``
+
+Misc
+~~~~
+
+* ``Add Trove classifiers in PyPI (Framework :: Apache Airflow :: Provider)``
+* ``Support for Python 3.10``
+* ``[doc] Improve s3 operator example by adding task upload_keys (#21422)``
+* ``Rename 'S3' hook name to 'Amazon S3' (#21988)``
+* ``Add template fields to DynamoDBToS3Operator (#22080)``
+
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``additional information in the ECSOperator around support of launch_type=EXTERNAL (#22093)``
+   * ``Add map_index to XCom model and interface (#22112)``
+   * ``Add sample dags and update doc for RedshiftClusterSensor, RedshiftPauseClusterOperator and RedshiftResumeClusterOperator (#22128)``
+   * ``Add sample dag and doc for RedshiftToS3Operator (#22060)``
+   * ``Add docs and sample dags for AWS Batch (#22010)``
+   * ``Add documentation for Feb Providers release (#22056)``
+   * ``Change BaseOperatorLink interface to take a ti_key, not a datetime (#21798)``
+   * ``Add pre-commit check for docstring param types (#21398)``
+   * ``Resolve mypy issue in athena example dag (#22020)``
+   * ``refactors polling logic for athena queries (#21488)``
+   * ``EMR on EKS Sample DAG and Docs Update (#22095)``
+   * ``Dynamo to S3 Sample DAG and Docs (#21920)``
+   * ``Cleanup RedshiftSQLOperator documentation (#21976)``
+   * ``Move S3ToRedshiftOperator documentation to transfer dir (#21975)``
+   * ``Protect against accidental misuse of XCom.get_value() (#22244)``
+   * ``Update ECS sample DAG and Docs to new standards (#21828)``
+   * ``Update EKS sample DAGs and docs (#21523)``
+   * ``EMR Sample DAG and Docs Update (#22189)``
 
 3.0.0
 .....
@@ -44,6 +253,7 @@ Features
 * ``AWS: Adds support for optional kwargs in the EKS Operators (#20819)``
 * ``AwsAthenaOperator: do not generate ''client_request_token'' if not provided (#20854)``
 * ``Add more SQL template fields renderers (#21237)``
+* ``Add conditional 'template_fields_renderers' check for new SQL lexers (#21403)``
 
 
 Bug fixes
@@ -51,6 +261,8 @@ Bug fixes
 
 * ``fix: cloudwatch logs fetch logic (#20814)``
 * ``Fix all Amazon Provider MyPy errors (#20935)``
+* ``Bug fix in AWS glue operator related to num_of_dpus #19787 (#21353)``
+* ``Fix to check if values are integer or float and convert accordingly. (#21277)``
 
 
 Misc
@@ -64,8 +276,10 @@ Misc
 * ``Standardize DynamoDB naming (#20360)``
 * ``Standardize AWS ECS naming (#20332)``
 * ``Refactor operator links to not create ad hoc TaskInstances (#21285)``
+* ``eks_hook log level fatal -> FATAL  (#21427)``
 
-.. Review and move the new changes to one of the sections above:
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
    * ``Remove ':type' directives from 'SqlToS3Operator' (#21079)``
    * ``Remove a few stray ':type's in docs (#21014)``
    * ``Remove ':type' lines now sphinx-autoapi supports typehints (#20951)``
@@ -77,6 +291,7 @@ Misc
    * ``Fix MyPy in Amazon provider for Sagemaker operator (#20715)``
    * ``Fix MyPy errors for Amazon DMS in hooks and operator (#20710)``
    * ``Fix MyPy issues in ''airflow/providers/amazon/aws/transfers'' (#20708)``
+   * ``Add documentation for January 2021 providers release (#21257)``
 
 2.6.0
 .....

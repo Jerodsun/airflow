@@ -99,26 +99,6 @@ breeze and I'll run unit tests for my Hook.
 
       root@fafd8d630e46:/opt/airflow# python -m pytest tests/providers/<NEW_PROVIDER>/hook/<NEW_PROVIDER>.py
 
-Update Airflow validation tests
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-There are some tests that Airflow performs to ensure consistency that is related to the providers.
-
-  .. code-block:: bash
-
-      airflow/scripts/in_container/
-      └── run_install_and_test_provider_packages.sh
-      tests/core/
-      └── test_providers_manager.py
-
-Change expected number of providers, hooks and connections if needed in ``run_install_and_test_provider_packages.sh`` file.
-
-Add your provider information in the following variables in ``test_providers_manager.py``:
-
-- add your provider to ``ALL_PROVIDERS`` list;
-- add your provider into ``CONNECTIONS_LIST`` if your provider create a new connection type.
-
-
 Integration tests
 ^^^^^^^^^^^^^^^^^
 
@@ -301,8 +281,8 @@ main Airflow documentation that involves some steps with the providers is also w
 
   .. code-block:: bash
 
-    ./breeze build-docs -- --package-filter apache-airflow-providers-<NEW_PROVIDER>
-    ./breeze build-docs -- --package-filter apache-airflow
+    ./breeze build-docs --package-filter apache-airflow-providers-<NEW_PROVIDER>
+    ./breeze build-docs --package-filter apache-airflow
 
 Optional provider features
 --------------------------
@@ -323,11 +303,11 @@ missing in provider dependencies.
 In Airflow 2.3, new exception :class:`~airflow.exceptions.OptionalProviderFeatureException` has been
 introduced and Providers can use the exception to signal that the ImportError (or any other error) should
 be ignored by Airflow ProvidersManager. However this Exception is only available in Airflow 2.3 so if
-providers would like to remain compatible with Airflow 2.1 and 2.2, they should continue throwing
+providers would like to remain compatible with 2.2, they should continue throwing
 the ImportError exception.
 
 Example code (from Plyvel Hook, part of the Google Provider) explains how such conditional error handling
-should be implemented to keep compatibility with Airflow 2.1 and 2.2
+should be implemented to keep compatibility with 2.2
 
   .. code-block:: python
 
@@ -349,6 +329,84 @@ should be implemented to keep compatibility with Airflow 2.1 and 2.2
             # This try/except can be removed when the provider depends on Airflow >= 2.3.0
             raise e
         raise AirflowOptionalProviderFeatureException(e)
+
+
+Using Providers with dynamic task mapping
+-----------------------------------------
+
+Airflow 2.3 added `Dynamic Task Mapping <https://cwiki.apache.org/confluence/display/AIRFLOW/AIP-42+Dynamic+Task+Mapping>`_
+and it added the possibility of assigning a unique key to each task. Which means that when such dynamically
+mapped task wants to retrieve a value from XCom (for example in case an extra link should calculated)
+it should always check if the ti_key value passed is not None an only then retrieve the XCom value using
+XCom.get_value. This allows to keep backwards compatibility with earlier versions of Airflow.
+
+Typical code to access XCom Value in providers that want to keep backwards compatibility should look similar to
+this (note the ``if ti_key is not None:`` condition).
+
+  .. code-block:: python
+
+    def get_link(
+        self,
+        operator,
+        dttm: Optional[datetime] = None,
+        ti_key: Optional["TaskInstanceKey"] = None,
+    ):
+        if ti_key is not None:
+            job_ids = XCom.get_value(key="job_id", ti_key=ti_key)
+        else:
+            assert dttm is not None
+            job_ids = XCom.get_one(
+                key="job_id",
+                dag_id=operator.dag.dag_id,
+                task_id=operator.task_id,
+                execution_date=dttm,
+            )
+        if not job_ids:
+            return None
+        if len(job_ids) < self.index:
+            return None
+        job_id = job_ids[self.index]
+        return BIGQUERY_JOB_DETAILS_LINK_FMT.format(job_id=job_id)
+
+
+Having sensors return XOM values
+--------------------------------
+In Airflow 2.3, sensor operators will be able to return XCOM values. This is achieved by returning an instance of the ``PokeReturnValue`` object at the end of the ``poke()`` method:
+
+  .. code-block:: python
+
+    from airflow.sensors.base import PokeReturnValue
+
+
+    class SensorWithXcomValue(BaseSensorOperator):
+        def poke(self, context: Context) -> Union[bool, PokeReturnValue]:
+            # ...
+            is_done = ...  # set to true if the sensor should stop poking.
+            xcom_value = ...  # return value of the sensor operator to be pushed to XCOM.
+            return PokeReturnValue(is_done, xcom_value)
+
+
+To implement a sensor operator that pushes a XCOM value and supports both version 2.3 and pre-2.3, you need to explicitly push the XCOM value if the version is pre-2.3.
+
+  .. code-block:: python
+
+    try:
+        from airflow.sensors.base import PokeReturnValue
+    except ImportError:
+        PokeReturnValue = None
+
+
+    class SensorWithXcomValue(BaseSensorOperator):
+        def poke(self, context: Context) -> bool:
+            # ...
+            is_done = ...  # set to true if the sensor should stop poking.
+            xcom_value = ...  # return value of the sensor operator to be pushed to XCOM.
+            if PokeReturnValue is not None:
+                return PokeReturnValue(is_done, xcom_value)
+            else:
+                if is_done:
+                    context["ti"].xcom_push(key="xcom_key", value=xcom_value)
+                return is_done
 
 
 How-to Update a community provider

@@ -21,11 +21,8 @@
 """Exceptions used by Airflow"""
 import datetime
 import warnings
+from http import HTTPStatus
 from typing import Any, Dict, List, NamedTuple, Optional, Sized
-
-from airflow.api_connexion.exceptions import NotFound as ApiConnexionNotFound
-from airflow.utils.code_utils import prepare_code_snippet
-from airflow.utils.platform import is_tty
 
 
 class AirflowException(Exception):
@@ -35,19 +32,19 @@ class AirflowException(Exception):
     Each custom exception should be derived from this class.
     """
 
-    status_code = 500
+    status_code = HTTPStatus.INTERNAL_SERVER_ERROR
 
 
 class AirflowBadRequest(AirflowException):
     """Raise when the application or server cannot handle the request."""
 
-    status_code = 400
+    status_code = HTTPStatus.BAD_REQUEST
 
 
-class AirflowNotFoundException(AirflowException, ApiConnexionNotFound):
+class AirflowNotFoundException(AirflowException):
     """Raise when the requested object/resource is not available in the system."""
 
-    status_code = 404
+    status_code = HTTPStatus.NOT_FOUND
 
 
 class AirflowConfigException(AirflowException):
@@ -100,6 +97,17 @@ class AirflowFailException(AirflowException):
 
 class AirflowOptionalProviderFeatureException(AirflowException):
     """Raise by providers when imports are missing for optional provider features."""
+
+
+class UnmappableOperator(AirflowException):
+    """Raise when an operator is not implemented to be mappable."""
+
+
+class XComForMappingNotPushed(AirflowException):
+    """Raise when a mapped downstream's dependency fails to push XCom for task mapping."""
+
+    def __str__(self) -> str:
+        return "did not push XCom for task mapping"
 
 
 class UnmappableXComTypePushed(AirflowException):
@@ -178,6 +186,23 @@ class DuplicateTaskIdFound(AirflowException):
     """Raise when a Task with duplicate task_id is defined in the same DAG."""
 
 
+class TaskAlreadyInTaskGroup(AirflowException):
+    """Raise when a Task cannot be added to a TaskGroup since it already belongs to another TaskGroup."""
+
+    def __init__(self, task_id: str, existing_group_id: Optional[str], new_group_id: str) -> None:
+        super().__init__(task_id, new_group_id)
+        self.task_id = task_id
+        self.existing_group_id = existing_group_id
+        self.new_group_id = new_group_id
+
+    def __str__(self) -> str:
+        if self.existing_group_id is None:
+            existing_group = "the DAG's root group"
+        else:
+            existing_group = f"group {self.existing_group_id!r}"
+        return f"cannot add {self.task_id!r} to {self.new_group_id!r} (already in {existing_group})"
+
+
 class SerializationError(AirflowException):
     """A problem occurred when trying to serialize a DAG."""
 
@@ -249,6 +274,9 @@ class AirflowFileParseException(AirflowException):
         self.parse_errors = parse_errors
 
     def __str__(self):
+        from airflow.utils.code_utils import prepare_code_snippet
+        from airflow.utils.platform import is_tty
+
         result = f"{self.msg}\nFilename: {self.file_path}\n\n"
 
         for error_no, parse_error in enumerate(self.parse_errors, 1):

@@ -577,7 +577,7 @@ class EksHook(AwsBaseHook):
                             "env": [
                                 {
                                     "name": "AIRFLOW__LOGGING__LOGGING_LEVEL",
-                                    "value": "fatal",
+                                    "value": "FATAL",
                                 }
                             ],
                             "interactiveMode": "Never",
@@ -638,7 +638,7 @@ class EKSHook(EksHook):
 
     def __init__(self, *args, **kwargs):
         warnings.warn(
-            "This hook is deprecated. " "Please use `airflow.providers.amazon.aws.hooks.eks.EksHook`.",
+            "This hook is deprecated. Please use `airflow.providers.amazon.aws.hooks.eks.EksHook`.",
             DeprecationWarning,
             stacklevel=2,
         )

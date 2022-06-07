@@ -24,6 +24,7 @@
 # deps from those pre-installed dependencies. It saves few minutes of build time when setup.py changes.
 #
 # If INSTALL_MYSQL_CLIENT is set to false, mysql extra is removed
+# If INSTALL_POSTGRES_CLIENT is set to false, postgres extra is removed
 #
 # shellcheck source=scripts/docker/common.sh
 . "$( dirname "${BASH_SOURCE[0]}" )/common.sh"
@@ -31,6 +32,7 @@
 : "${AIRFLOW_REPO:?Should be set}"
 : "${AIRFLOW_BRANCH:?Should be set}"
 : "${INSTALL_MYSQL_CLIENT:?Should be true or false}"
+: "${INSTALL_POSTGRES_CLIENT:?Should be true or false}"
 : "${AIRFLOW_PIP_VERSION:?Should be set}"
 
 function install_airflow_dependencies_from_branch_tip() {
@@ -40,14 +42,19 @@ function install_airflow_dependencies_from_branch_tip() {
     if [[ ${INSTALL_MYSQL_CLIENT} != "true" ]]; then
        AIRFLOW_EXTRAS=${AIRFLOW_EXTRAS/mysql,}
     fi
+    if [[ ${INSTALL_POSTGRES_CLIENT} != "true" ]]; then
+       AIRFLOW_EXTRAS=${AIRFLOW_EXTRAS/postgres,}
+    fi
     # Install latest set of dependencies using constraints. In case constraints were upgraded and there
     # are conflicts, this might fail, but it should be fixed in the following installation steps
-    pip install \
+    set -x
+    pip install --root-user-action ignore \
       "https://github.com/${AIRFLOW_REPO}/archive/${AIRFLOW_BRANCH}.tar.gz#egg=apache-airflow[${AIRFLOW_EXTRAS}]" \
       --constraint "${AIRFLOW_CONSTRAINTS_LOCATION}" || true
     # make sure correct PIP version is used
-    pip install --disable-pip-version-check "pip==${AIRFLOW_PIP_VERSION}"
+    pip install --disable-pip-version-check "pip==${AIRFLOW_PIP_VERSION}" 2>/dev/null
     pip freeze | grep apache-airflow-providers | xargs pip uninstall --yes 2>/dev/null || true
+    set +x
     echo
     echo "${COLOR_BLUE}Uninstalling just airflow. Dependencies remain. Now target airflow can be reinstalled using mostly cached dependencies${COLOR_RESET}"
     echo

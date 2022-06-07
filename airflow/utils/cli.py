@@ -34,7 +34,6 @@ from typing import TYPE_CHECKING, Callable, Optional, TypeVar, cast
 from airflow import settings
 from airflow.exceptions import AirflowException
 from airflow.utils import cli_action_loggers
-from airflow.utils.db import check_and_run_migrations, synchronize_log_template
 from airflow.utils.log.non_caching_file_handler import NonCachingFileHandler
 from airflow.utils.platform import getuser, is_terminal_support_colors
 from airflow.utils.session import provide_session
@@ -42,7 +41,7 @@ from airflow.utils.session import provide_session
 T = TypeVar("T", bound=Callable)
 
 if TYPE_CHECKING:
-    from airflow.models import DAG
+    from airflow.models.dag import DAG
 
 
 def _check_cli_args(args):
@@ -50,7 +49,7 @@ def _check_cli_args(args):
         raise ValueError("Args should be set")
     if not isinstance(args[0], Namespace):
         raise ValueError(
-            "1st positional argument should be argparse.Namespace instance," f"but is {type(args[0])}"
+            f"1st positional argument should be argparse.Namespace instance, but is {type(args[0])}"
         )
 
 
@@ -93,6 +92,8 @@ def action_cli(func=None, check_db=True):
             try:
                 # Check and run migrations if necessary
                 if check_db:
+                    from airflow.utils.db import check_and_run_migrations, synchronize_log_template
+
                     check_and_run_migrations()
                     synchronize_log_template()
                 return f(*args, **kwargs)
@@ -147,7 +148,7 @@ def _build_metrics(func_name, namespace):
 
     if not isinstance(namespace, Namespace):
         raise ValueError(
-            "namespace argument should be argparse.Namespace instance," f"but is {type(namespace)}"
+            f"namespace argument should be argparse.Namespace instance, but is {type(namespace)}"
         )
     tmp_dic = vars(namespace)
     metrics['dag_id'] = tmp_dic.get('dag_id')
@@ -205,6 +206,16 @@ def get_dag(subdir: Optional[str], dag_id: str) -> "DAG":
     return dagbag.dags[dag_id]
 
 
+def get_dag_by_deserialization(dag_id: str) -> "DAG":
+    from airflow.models.serialized_dag import SerializedDagModel
+
+    dag_model = SerializedDagModel.get(dag_id)
+    if dag_model is None:
+        raise AirflowException(f"Serialized DAG: {dag_id} could not be found")
+
+    return dag_model.dag
+
+
 def get_dags(subdir: Optional[str], dag_id: str, use_regex: bool = False):
     """Returns DAG(s) matching a given regex or dag_id"""
     from airflow.models import DagBag
@@ -228,7 +239,7 @@ def get_dag_by_pickle(pickle_id, session=None):
 
     dag_pickle = session.query(DagPickle).filter(DagPickle.id == pickle_id).first()
     if not dag_pickle:
-        raise AirflowException("Who hid the pickle!? [missing pickle]")
+        raise AirflowException(f"pickle_id could not be found in DagPickle.id list: {pickle_id}")
     pickle_dag = dag_pickle.pickle
     return pickle_dag
 

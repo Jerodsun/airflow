@@ -19,9 +19,10 @@
 from contextlib import contextmanager
 from copy import copy
 from logging import DEBUG, ERROR, INFO, WARNING
-from typing import Any, Callable, Dict, Iterator, Optional
+from typing import Any, Callable, Dict, Generator, Optional
 from weakref import WeakKeyDictionary
 
+from pypsrp.host import PSHost
 from pypsrp.messages import MessageType
 from pypsrp.powershell import PowerShell, PSInvocationState, RunspacePool
 from pypsrp.wsman import WSMan
@@ -47,30 +48,26 @@ class PsrpHook(BaseHook):
     sessions.
 
     :param psrp_conn_id: Required. The name of the PSRP connection.
-    :type psrp_conn_id: str
     :param logging_level:
         Logging level for message streams which are received during remote execution.
         The default is to include all messages in the task log.
-    :type logging_level: int
     :param operation_timeout: Override the default WSMan timeout when polling the pipeline.
-    :type operation_timeout: float
     :param runspace_options:
         Optional dictionary which is passed when creating the runspace pool. See
         :py:class:`~pypsrp.powershell.RunspacePool` for a description of the
         available options.
-    :type runspace_options: dict
     :param wsman_options:
         Optional dictionary which is passed when creating the `WSMan` client. See
         :py:class:`~pypsrp.wsman.WSMan` for a description of the available options.
-    :type wsman_options: dict
     :param on_output_callback:
         Optional callback function to be called whenever an output response item is
         received during job status polling.
-    :type on_output_callback: OutputCallback
     :param exchange_keys:
         If true (default), automatically initiate a session key exchange when the
         hook is used as a context manager.
-    :type exchange_keys: bool
+    :param host:
+        Optional PowerShell host instance. If this is not set, the default
+        implementation will be used.
 
     You can provide an alternative `configuration_name` using either `runspace_options`
     or by setting this key as the extra fields of your connection.
@@ -89,6 +86,7 @@ class PsrpHook(BaseHook):
         wsman_options: Optional[Dict[str, Any]] = None,
         on_output_callback: Optional[OutputCallback] = None,
         exchange_keys: bool = True,
+        host: Optional[PSHost] = None,
     ):
         self.conn_id = psrp_conn_id
         self._logging_level = logging_level
@@ -97,6 +95,7 @@ class PsrpHook(BaseHook):
         self._wsman_options = wsman_options or {}
         self._on_output_callback = on_output_callback
         self._exchange_keys = exchange_keys
+        self._host = host or PSHost(None, None, False, type(self).__name__, None, None, "1.0")
 
     def __enter__(self):
         conn = self.get_conn()
@@ -151,12 +150,12 @@ class PsrpHook(BaseHook):
 
         if extra:
             raise AirflowException(f"Unexpected extra configuration keys: {', '.join(sorted(extra))}")
-        pool = RunspacePool(wsman, **runspace_options)
+        pool = RunspacePool(wsman, host=self._host, **runspace_options)
         self._wsman_ref[pool] = wsman
         return pool
 
     @contextmanager
-    def invoke(self) -> Iterator[PowerShell]:
+    def invoke(self) -> Generator[PowerShell, None, None]:
         """
         Context manager that yields a PowerShell object to which commands can be
         added. Upon exit, the commands will be invoked.

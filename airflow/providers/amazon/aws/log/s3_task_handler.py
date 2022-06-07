@@ -16,7 +16,9 @@
 # specific language governing permissions and limitations
 # under the License.
 import os
+import pathlib
 import sys
+from typing import Optional
 
 if sys.version_info >= (3, 8):
     from functools import cached_property
@@ -35,7 +37,7 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
     uploads to and reads from S3 remote storage.
     """
 
-    def __init__(self, base_log_folder: str, s3_log_folder: str, filename_template: str):
+    def __init__(self, base_log_folder: str, s3_log_folder: str, filename_template: Optional[str] = None):
         super().__init__(base_log_folder, filename_template)
         self.remote_base = s3_log_folder
         self.log_relative_path = ''
@@ -92,8 +94,7 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
         remote_loc = os.path.join(self.remote_base, self.log_relative_path)
         if os.path.exists(local_loc):
             # read log and remove old logs to get just the latest additions
-            with open(local_loc) as logfile:
-                log = logfile.read()
+            log = pathlib.Path(local_loc).read_text()
             self.s3_write(log, remote_loc)
 
         # Mark closed so we don't double write if close is called twice
@@ -165,7 +166,7 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
                 return msg
         return ''
 
-    def s3_write(self, log: str, remote_log_location: str, append: bool = True):
+    def s3_write(self, log: str, remote_log_location: str, append: bool = True, max_retry: int = 1):
         """
         Writes the log to the remote_log_location. Fails silently if no hook
         was created.
@@ -174,6 +175,7 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
         :param remote_log_location: the log's location in remote storage
         :param append: if False, any existing log file is overwritten. If True,
             the new log is appended to any existing logs.
+        :param max_retry: Maximum number of times to retry on upload failure
         """
         try:
             if append and self.s3_log_exists(remote_log_location):
@@ -182,12 +184,20 @@ class S3TaskHandler(FileTaskHandler, LoggingMixin):
         except Exception:
             self.log.exception('Could not verify previous log to append')
 
-        try:
-            self.hook.load_string(
-                log,
-                key=remote_log_location,
-                replace=True,
-                encrypt=conf.getboolean('logging', 'ENCRYPT_S3_LOGS'),
-            )
-        except Exception:
-            self.log.exception('Could not write logs to %s', remote_log_location)
+        # Default to a single retry attempt because s3 upload failures are
+        # rare but occasionally occur.  Multiple retry attempts are unlikely
+        # to help as they usually indicate non-empheral errors.
+        for try_num in range(1 + max_retry):
+            try:
+                self.hook.load_string(
+                    log,
+                    key=remote_log_location,
+                    replace=True,
+                    encrypt=conf.getboolean('logging', 'ENCRYPT_S3_LOGS'),
+                )
+                break
+            except Exception:
+                if try_num < max_retry:
+                    self.log.warning('Failed attempt to write logs to %s, will retry', remote_log_location)
+                else:
+                    self.log.exception('Could not write logs to %s', remote_log_location)

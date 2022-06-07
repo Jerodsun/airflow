@@ -154,7 +154,8 @@ Here is an example of a task with both features:
 .. code-block:: python
 
     import os
-    from datetime import datetime
+
+    import pendulum
 
     from airflow import DAG
     from airflow.decorators import task
@@ -166,7 +167,7 @@ Here is an example of a task with both features:
     with DAG(
         dag_id="example_pod_template_file",
         schedule_interval=None,
-        start_date=datetime(2021, 1, 1),
+        start_date=pendulum.datetime(2021, 1, 1, tz="UTC"),
         catchup=False,
         tags=["example3"],
     ) as dag:
@@ -213,7 +214,10 @@ To get task logs out of the workers, you can:
 Comparison with CeleryExecutor
 ------------------------------
 
-In contrast to CeleryExecutor, KubernetesExecutor does not require additional components such as Redis and Flower, but does require access to Kubernetes cluster.
+In contrast to CeleryExecutor, KubernetesExecutor does not require additional components such as Redis,
+but does require access to Kubernetes cluster.
+
+Also monitoring the Pods can be done with the built-in Kubernetes monitoring.
 
 With KubernetesExecutor, each task runs in its own pod. The pod is created when the task is queued, and terminates when the task completes.
 Historically, in scenarios such as burstable workloads, this presented a resource utilization advantage over CeleryExecutor, where you needed

@@ -20,9 +20,9 @@ import datetime
 # This product contains a modified portion of 'Flask App Builder' developed by Daniel Vaz Gaspar.
 # (https://github.com/dpgaspar/Flask-AppBuilder).
 # Copyright 2013, Daniel Vaz Gaspar
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Set, Tuple, Union
 
-from flask import g
+from flask import current_app, g
 from flask_appbuilder.models.sqla import Model
 from sqlalchemy import (
     Boolean,
@@ -37,11 +37,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declared_attr
 from sqlalchemy.orm import backref, relationship
-from sqlalchemy.orm.relationships import foreign
+
+from airflow.models.base import Base
 
 """
 Compatibility note: The models in this file are duplicated from Flask AppBuilder.
 """
+# Use airflow metadata to create the tables
+Model.metadata = Base.metadata
 
 if TYPE_CHECKING:
     try:
@@ -54,7 +57,7 @@ def get_sequence_or_identity(sequence_name: str) -> Union[Sequence, 'Identity']:
     """
     Depending on the engine it either returns Sequence, or Identity (in case of MSSQL in SQLAlchemy 1.4).
     In SQLAlchemy 1.4 using sequence is not allowed for primary key columns in MsSQL.
-    Primary columns in MsSQL use IDENTITY keyword to autoincrement.
+    Primary columns in MsSQL use IDENTITY keyword to auto increment.
     Using Sequence for those fields used to be allowed in SQLAlchemy 1.3 (and essentially ignored
     if only name was specified).
 
@@ -140,17 +143,13 @@ class Permission(Model):
     action_id = Column("permission_id", Integer, ForeignKey("ab_permission.id"))
     action = relationship(
         "Action",
-        primaryjoin=action_id == foreign(Action.id),
         uselist=False,
-        backref="permission",
         lazy="joined",
     )
     resource_id = Column("view_menu_id", Integer, ForeignKey("ab_view_menu.id"))
     resource = relationship(
         "Resource",
-        primaryjoin=resource_id == foreign(Resource.id),
         uselist=False,
-        backref="permission",
         lazy="joined",
     )
 
@@ -182,7 +181,7 @@ class User(Model):
     last_login = Column(DateTime)
     login_count = Column(Integer)
     fail_login_count = Column(Integer)
-    roles = relationship("Role", secondary=assoc_user_role, backref="user", lazy="joined")
+    roles = relationship("Role", secondary=assoc_user_role, backref="user", lazy="selectin")
     created_on = Column(DateTime, default=datetime.datetime.now, nullable=True)
     changed_on = Column(DateTime, default=datetime.datetime.now, nullable=True)
 
@@ -230,10 +229,24 @@ class User(Model):
 
     @property
     def perms(self):
-        perms = set()
-        for role in self.roles:
-            perms.update((perm.action.name, perm.resource.name) for perm in role.permissions)
-        return perms
+        if not self._perms:
+            # Using the ORM here is _slow_ (Creating lots of objects to then throw them away) since this is in
+            # the path for every request. Avoid it if we can!
+            if current_app:
+                sm = current_app.appbuilder.sm
+                self._perms: Set[Tuple[str, str]] = set(
+                    sm.get_session.query(sm.action_model.name, sm.resource_model.name)
+                    .join(sm.permission_model.action)
+                    .join(sm.permission_model.resource)
+                    .join(sm.permission_model.role)
+                    .filter(sm.role_model.user.contains(self))
+                    .all()
+                )
+            else:
+                self._perms = {
+                    (perm.action.name, perm.resource.name) for role in self.roles for perm in role.permissions
+                }
+        return self._perms
 
     def get_id(self):
         return self.id
@@ -243,6 +256,8 @@ class User(Model):
 
     def __repr__(self):
         return self.get_full_name()
+
+    _perms = None
 
 
 class RegisterUser(Model):

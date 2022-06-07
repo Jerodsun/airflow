@@ -43,11 +43,10 @@ def provide_bucket_name(func: T) -> T:
     def wrapper(*args, **kwargs) -> T:
         bound_args = function_signature.bind(*args, **kwargs)
         self = args[0]
-        if 'bucket_name' not in bound_args.arguments or bound_args.arguments['bucket_name'] is None:
-            if self.oss_conn_id:
-                connection = self.get_connection(self.oss_conn_id)
-                if connection.schema:
-                    bound_args.arguments['bucket_name'] = connection.schema
+        if bound_args.arguments.get('bucket_name') is None and self.oss_conn_id:
+            connection = self.get_connection(self.oss_conn_id)
+            if connection.schema:
+                bound_args.arguments['bucket_name'] = connection.schema
 
         return func(*bound_args.args, **bound_args.kwargs)
 
@@ -89,10 +88,10 @@ class OSSHook(BaseHook):
     conn_type = 'oss'
     hook_name = 'OSS'
 
-    def __init__(self, region, oss_conn_id='oss_default', *args, **kwargs) -> None:
+    def __init__(self, region: Optional[str] = None, oss_conn_id='oss_default', *args, **kwargs) -> None:
         self.oss_conn_id = oss_conn_id
         self.oss_conn = self.get_connection(oss_conn_id)
-        self.region = region
+        self.region = self.get_default_region() if region is None else region
         super().__init__(*args, **kwargs)
 
     def get_conn(self) -> "Connection":
@@ -117,6 +116,7 @@ class OSSHook(BaseHook):
 
         return bucket_name, key
 
+    @provide_bucket_name
     @unify_bucket_name_and_key
     def object_exists(self, key: str, bucket_name: Optional[str] = None) -> bool:
         """
@@ -143,8 +143,10 @@ class OSSHook(BaseHook):
         :rtype: oss2.api.Bucket
         """
         auth = self.get_credential()
-        return oss2.Bucket(auth, 'http://oss-' + self.region + '.aliyuncs.com', bucket_name)
+        assert self.region is not None
+        return oss2.Bucket(auth, f'https://oss-{self.region}.aliyuncs.com', bucket_name)
 
+    @provide_bucket_name
     @unify_bucket_name_and_key
     def load_string(self, key: str, content: str, bucket_name: Optional[str] = None) -> None:
         """
@@ -159,6 +161,7 @@ class OSSHook(BaseHook):
         except Exception as e:
             raise AirflowException(f"Errors: {e}")
 
+    @provide_bucket_name
     @unify_bucket_name_and_key
     def upload_local_file(
         self,
@@ -178,6 +181,7 @@ class OSSHook(BaseHook):
         except Exception as e:
             raise AirflowException(f"Errors when upload file: {e}")
 
+    @provide_bucket_name
     @unify_bucket_name_and_key
     def download_file(
         self,
@@ -201,6 +205,7 @@ class OSSHook(BaseHook):
             return None
         return local_file
 
+    @provide_bucket_name
     @unify_bucket_name_and_key
     def delete_object(
         self,
@@ -219,6 +224,7 @@ class OSSHook(BaseHook):
             self.log.error(e)
             raise AirflowException(f"Errors when deleting: {key}")
 
+    @provide_bucket_name
     @unify_bucket_name_and_key
     def delete_objects(
         self,
@@ -269,19 +275,101 @@ class OSSHook(BaseHook):
             self.log.error(e)
             raise AirflowException(f"Errors when create bucket: {bucket_name}")
 
+    @provide_bucket_name
+    @unify_bucket_name_and_key
+    def append_string(self, bucket_name: Optional[str], content: str, key: str, pos: int) -> None:
+        """
+        Append string to a remote existing file
+
+        :param bucket_name: the name of the bucket
+        :param content: content to be appended
+        :param key: oss bucket key
+        :param pos: position of the existing file where the content will be appended
+        """
+        self.log.info("Write oss bucket. key: %s, pos: %s", key, pos)
+        try:
+            self.get_bucket(bucket_name).append_object(key, pos, content)
+        except Exception as e:
+            self.log.error(e)
+            raise AirflowException(f"Errors when append string for object: {key}")
+
+    @provide_bucket_name
+    @unify_bucket_name_and_key
+    def read_key(self, bucket_name: Optional[str], key: str) -> str:
+        """
+        Read oss remote object content with the specified key
+
+        :param bucket_name: the name of the bucket
+        :param key: oss bucket key
+        """
+        self.log.info("Read oss key: %s", key)
+        try:
+            return self.get_bucket(bucket_name).get_object(key).read().decode("utf-8")
+        except Exception as e:
+            self.log.error(e)
+            raise AirflowException(f"Errors when read bucket object: {key}")
+
+    @provide_bucket_name
+    @unify_bucket_name_and_key
+    def head_key(self, bucket_name: Optional[str], key: str) -> oss2.models.HeadObjectResult:
+        """
+        Get meta info of the specified remote object
+
+        :param bucket_name: the name of the bucket
+        :param key: oss bucket key
+        """
+        self.log.info("Head Object oss key: %s", key)
+        try:
+            return self.get_bucket(bucket_name).head_object(key)
+        except Exception as e:
+            self.log.error(e)
+            raise AirflowException(f"Errors when head bucket object: {key}")
+
+    @provide_bucket_name
+    @unify_bucket_name_and_key
+    def key_exist(self, bucket_name: Optional[str], key: str) -> bool:
+        """
+        Find out whether the specified key exists in the oss remote storage
+
+        :param bucket_name: the name of the bucket
+        :param key: oss bucket key
+        """
+        # full_path = None
+        self.log.info('Looking up oss bucket %s for bucket key %s ...', bucket_name, key)
+        try:
+            return self.get_bucket(bucket_name).object_exists(key)
+        except Exception as e:
+            self.log.error(e)
+            raise AirflowException(f"Errors when check bucket object existence: {key}")
+
     def get_credential(self) -> oss2.auth.Auth:
         extra_config = self.oss_conn.extra_dejson
         auth_type = extra_config.get('auth_type', None)
         if not auth_type:
             raise Exception("No auth_type specified in extra_config. ")
 
-        if auth_type == 'AK':
-            oss_access_key_id = extra_config.get('access_key_id', None)
-            oss_access_key_secret = extra_config.get('access_key_secret', None)
-            if not oss_access_key_id:
-                raise Exception("No access_key_id is specified for connection: " + self.oss_conn_id)
-            if not oss_access_key_secret:
-                raise Exception("No access_key_secret is specified for connection: " + self.oss_conn_id)
-            return oss2.Auth(oss_access_key_id, oss_access_key_secret)
-        else:
-            raise Exception("Unsupported auth_type: " + auth_type)
+        if auth_type != 'AK':
+            raise Exception(f"Unsupported auth_type: {auth_type}")
+        oss_access_key_id = extra_config.get('access_key_id', None)
+        oss_access_key_secret = extra_config.get('access_key_secret', None)
+        if not oss_access_key_id:
+            raise Exception(f"No access_key_id is specified for connection: {self.oss_conn_id}")
+
+        if not oss_access_key_secret:
+            raise Exception(f"No access_key_secret is specified for connection: {self.oss_conn_id}")
+
+        return oss2.Auth(oss_access_key_id, oss_access_key_secret)
+
+    def get_default_region(self) -> Optional[str]:
+        extra_config = self.oss_conn.extra_dejson
+        auth_type = extra_config.get('auth_type', None)
+        if not auth_type:
+            raise Exception("No auth_type specified in extra_config. ")
+
+        if auth_type != 'AK':
+            raise Exception(f"Unsupported auth_type: {auth_type}")
+
+        default_region = extra_config.get('region', None)
+        if not default_region:
+            raise Exception(f"No region is specified for connection: {self.oss_conn_id}")
+        return default_region

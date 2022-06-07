@@ -20,11 +20,10 @@ import logging
 import re
 from typing import TYPE_CHECKING, Any, Dict, Iterable, List, Optional, Set, Tuple, Union
 
+from airflow import settings
 from airflow.compat.functools import cache, cached_property
 
 if TYPE_CHECKING:
-    from airflow.typing_compat import RePatternType
-
     RedactableItem = Union[str, Dict[Any, Any], Tuple[Any, ...], List[Any]]
 
 
@@ -43,6 +42,8 @@ DEFAULT_SENSITIVE_FIELDS = frozenset(
         'private_key',
         'secret',
         'token',
+        'keyfile_dict',
+        'service_account',
     }
 )
 """Names of fields (Connection extra, Variable key name etc.) that are deemed sensitive"""
@@ -82,12 +83,9 @@ def mask_secret(secret: Union[str, dict, Iterable], name: Optional[str] = None) 
     If ``secret`` is a dict or a iterable (excluding str) then it will be
     recursively walked and keys with sensitive names will be hidden.
     """
-    # Delay import
-    from airflow import settings
-
     # Filtering all log messages is not a free process, so we only do it when
     # running tasks
-    if not settings.MASK_SECRETS_IN_LOGS or not secret:
+    if not secret:
         return
 
     _secrets_masker().add_mask(secret, name)
@@ -115,7 +113,7 @@ def _secrets_masker() -> "SecretsMasker":
 class SecretsMasker(logging.Filter):
     """Redact secrets from logs"""
 
-    replacer: Optional["RePatternType"] = None
+    replacer: Optional[re.Pattern] = None
     patterns: Set[str]
 
     ALREADY_FILTERED_FLAG = "__SecretsMasker_filtered"
@@ -147,13 +145,21 @@ class SecretsMasker(logging.Filter):
         return frozenset(record.__dict__).difference({'msg', 'args'})
 
     def _redact_exception_with_context(self, exception):
-        exception.args = (self.redact(v) for v in exception.args)
+        # Exception class may not be modifiable (e.g. declared by an
+        # extension module such as JDBC).
+        try:
+            exception.args = (self.redact(v) for v in exception.args)
+        except AttributeError:
+            pass
         if exception.__context__:
             self._redact_exception_with_context(exception.__context__)
         if exception.__cause__ and exception.__cause__ is not exception.__context__:
             self._redact_exception_with_context(exception.__cause__)
 
     def filter(self, record) -> bool:
+        if settings.MASK_SECRETS_IN_LOGS is not True:
+            return True
+
         if self.ALREADY_FILTERED_FLAG in record.__dict__:
             # Filters are attached to multiple handlers and logs, keep a
             # "private" flag that stops us needing to process it more than once

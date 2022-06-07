@@ -26,6 +26,7 @@ from airflow.models import BaseOperator, BaseOperatorLink, XCom
 from airflow.providers.amazon.aws.hooks.emr import EmrHook
 
 if TYPE_CHECKING:
+    from airflow.models.taskinstance import TaskInstanceKey
     from airflow.utils.context import Context
 
 
@@ -40,6 +41,10 @@ from airflow.providers.amazon.aws.hooks.emr import EmrContainerHook
 class EmrAddStepsOperator(BaseOperator):
     """
     An operator that adds steps to an existing EMR job_flow.
+
+    .. seealso::
+        For more information on how to use this operator, take a look at the guide:
+        :ref:`howto/operator:EmrAddStepsOperator`
 
     :param job_flow_id: id of the JobFlow to add steps to. (templated)
     :param job_flow_name: name of the JobFlow to add steps to. Use as an alternative to passing
@@ -117,6 +122,10 @@ class EmrContainerOperator(BaseOperator):
     """
     An operator that submits jobs to EMR on EKS virtual clusters.
 
+    .. seealso::
+        For more information on how to use this operator, take a look at the guide:
+        :ref:`howto/operator:EmrContainerOperator`
+
     :param name: The name of the job run.
     :param virtual_cluster_id: The EMR on EKS virtual cluster ID
     :param execution_role_arn: The IAM role ARN associated with the job run.
@@ -128,9 +137,12 @@ class EmrContainerOperator(BaseOperator):
         Use this if you want to specify a unique ID to prevent two jobs from getting started.
         If no token is provided, a UUIDv4 token will be generated for you.
     :param aws_conn_id: The Airflow connection used for AWS credentials.
+    :param wait_for_completion: Whether or not to wait in the operator for the job to complete.
     :param poll_interval: Time (in seconds) to wait between two consecutive calls to check query status on EMR
     :param max_tries: Maximum number of times to wait for the job run to finish.
         Defaults to None, which will poll until the job is *not* in a pending, submitted, or running state.
+    :param tags: The tags assigned to job runs.
+        Defaults to None
     """
 
     template_fields: Sequence[str] = (
@@ -153,8 +165,10 @@ class EmrContainerOperator(BaseOperator):
         configuration_overrides: Optional[dict] = None,
         client_request_token: Optional[str] = None,
         aws_conn_id: str = "aws_default",
+        wait_for_completion: bool = True,
         poll_interval: int = 30,
         max_tries: Optional[int] = None,
+        tags: Optional[dict] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -166,8 +180,10 @@ class EmrContainerOperator(BaseOperator):
         self.configuration_overrides = configuration_overrides or {}
         self.aws_conn_id = aws_conn_id
         self.client_request_token = client_request_token or str(uuid4())
+        self.wait_for_completion = wait_for_completion
         self.poll_interval = poll_interval
         self.max_tries = max_tries
+        self.tags = tags
         self.job_id: Optional[str] = None
 
     @cached_property
@@ -187,20 +203,22 @@ class EmrContainerOperator(BaseOperator):
             self.job_driver,
             self.configuration_overrides,
             self.client_request_token,
+            self.tags,
         )
-        query_status = self.hook.poll_query_status(self.job_id, self.max_tries, self.poll_interval)
+        if self.wait_for_completion:
+            query_status = self.hook.poll_query_status(self.job_id, self.max_tries, self.poll_interval)
 
-        if query_status in EmrContainerHook.FAILURE_STATES:
-            error_message = self.hook.get_job_failure_reason(self.job_id)
-            raise AirflowException(
-                f"EMR Containers job failed. Final state is {query_status}. "
-                f"query_execution_id is {self.job_id}. Error: {error_message}"
-            )
-        elif not query_status or query_status in EmrContainerHook.INTERMEDIATE_STATES:
-            raise AirflowException(
-                f"Final state of EMR Containers job is {query_status}. "
-                f"Max tries of poll status exceeded, query_execution_id is {self.job_id}."
-            )
+            if query_status in EmrContainerHook.FAILURE_STATES:
+                error_message = self.hook.get_job_failure_reason(self.job_id)
+                raise AirflowException(
+                    f"EMR Containers job failed. Final state is {query_status}. "
+                    f"query_execution_id is {self.job_id}. Error: {error_message}"
+                )
+            elif not query_status or query_status in EmrContainerHook.INTERMEDIATE_STATES:
+                raise AirflowException(
+                    f"Final state of EMR Containers job is {query_status}. "
+                    f"Max tries of poll status exceeded, query_execution_id is {self.job_id}."
+                )
 
         return self.job_id
 
@@ -230,7 +248,12 @@ class EmrClusterLink(BaseOperatorLink):
 
     name = 'EMR Cluster'
 
-    def get_link(self, operator: BaseOperator, dttm: datetime) -> str:
+    def get_link(
+        self,
+        operator,
+        dttm: Optional[datetime] = None,
+        ti_key: Optional["TaskInstanceKey"] = None,
+    ) -> str:
         """
         Get link to EMR cluster.
 
@@ -238,9 +261,13 @@ class EmrClusterLink(BaseOperatorLink):
         :param dttm: datetime
         :return: url link
         """
-        flow_id = XCom.get_one(
-            key="return_value", dag_id=operator.dag.dag_id, task_id=operator.task_id, execution_date=dttm
-        )
+        if ti_key is not None:
+            flow_id = XCom.get_value(key="return_value", ti_key=ti_key)
+        else:
+            assert dttm
+            flow_id = XCom.get_one(
+                key="return_value", dag_id=operator.dag_id, task_id=operator.task_id, execution_date=dttm
+            )
         return (
             f'https://console.aws.amazon.com/elasticmapreduce/home#cluster-details:{flow_id}'
             if flow_id
@@ -253,6 +280,10 @@ class EmrCreateJobFlowOperator(BaseOperator):
     Creates an EMR JobFlow, reading the config from the EMR connection.
     A dictionary of JobFlow overrides can be passed that override
     the config from the connection.
+
+    .. seealso::
+        For more information on how to use this operator, take a look at the guide:
+        :ref:`howto/operator:EmrCreateJobFlowOperator`
 
     :param aws_conn_id: aws connection to uses
     :param emr_conn_id: emr connection to use
@@ -310,6 +341,11 @@ class EmrCreateJobFlowOperator(BaseOperator):
 class EmrModifyClusterOperator(BaseOperator):
     """
     An operator that modifies an existing EMR cluster.
+
+    .. seealso::
+        For more information on how to use this operator, take a look at the guide:
+        :ref:`howto/operator:EmrModifyClusterOperator`
+
     :param cluster_id: cluster identifier
     :param step_concurrency_level: Concurrency of the cluster
     :param aws_conn_id: aws connection to uses
@@ -353,6 +389,10 @@ class EmrModifyClusterOperator(BaseOperator):
 class EmrTerminateJobFlowOperator(BaseOperator):
     """
     Operator to terminate EMR JobFlows.
+
+    .. seealso::
+        For more information on how to use this operator, take a look at the guide:
+        :ref:`howto/operator:EmrTerminateJobFlowOperator`
 
     :param job_flow_id: id of the JobFlow to terminate. (templated)
     :param aws_conn_id: aws connection to uses
