@@ -21,8 +21,243 @@
    and you want to add an explanation to the users on how they are supposed to deal with them.
    The changelog is updated and maintained semi-automatically by release manager.
 
+``apache-airflow-providers-ftp``
+
+
 Changelog
 ---------
+
+3.9.1
+.....
+
+Misc
+~~~~
+
+* ``Faster 'airflow_version' imports (#39552)``
+* ``Simplify 'airflow_version' imports (#39497)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Reapply templates for all providers (#39554)``
+
+3.9.0
+.....
+
+.. note::
+  This release of provider is only available for Airflow 2.7+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+Misc
+~~~~
+
+* ``Bump minimum Airflow version in providers to Airflow 2.7.0 (#39240)``
+
+
+3.8.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add ssl context for verification of certs in FTPS hook (#38266)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Update yanked versions in providers changelogs (#38262)``
+   * ``Bump ruff to 0.3.3 (#38240)``
+   * ``Resolve G004: Logging statement uses f-string (#37873)``
+   * ``Prepare docs 1st wave (RC1) March 2024 (#37876)``
+   * ``Prepare docs 1st wave of Providers February 2024 (#37326)``
+   * ``Revert "Provide the logger_name param in providers hooks in order to override the logger name (#36675)" (#37015)``
+   * ``Prepare docs 2nd wave of Providers January 2024 (#36945)``
+   * ``Provide the logger_name param in providers hooks in order to override the logger name (#36675)``
+   * ``Prepare docs 1st wave of Providers January 2024 (#36640)``
+   * ``Speed up autocompletion of Breeze by simplifying provider state (#36499)``
+   * ``Re-apply updated version numbers to 2nd wave of providers in December (#36380)``
+   * ``Prepare 2nd wave of providers in December (#36373)``
+   * ``Add docs for RC2 wave of providers for 2nd round of Jan 2024 (#37019)``
+   * ``Add documentation for 3rd wave of providers in Deember (#36464)``
+   * ``Add code snippet formatting in docstrings via Ruff (#36262)``
+
+3.7.0
+.....
+
+.. note::
+  This release of provider is only available for Airflow 2.6+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+Misc
+~~~~
+
+* ``Bump minimum Airflow version in providers to Airflow 2.6.0 (#36017)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Add bandit to pre-commit to detect common security issues (#34247)``
+   * ``Fix and reapply templates for provider documentation (#35686)``
+   * ``Prepare docs 2nd wave of Providers November 2023 (#35836)``
+   * ``Use reproducible builds for provider packages (#35693)``
+
+3.6.1
+.....
+
+Bug Fixes
+~~~~~~~~~
+
+* ``FTPHook methods should not change working directory (#35105)``
+
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Switch from Black to Ruff formatter (#35287)``
+   * ``Prepare docs 3rd wave of Providers October 2023 - FIX (#35233)``
+   * ``Prepare docs 3rd wave of Providers October 2023 (#35187)``
+   * ``Pre-upgrade 'ruff==0.0.292' changes in providers (#35053)``
+   * ``Upgrade pre-commits (#35033)``
+   * ``D401 Support - Providers: DaskExecutor to Github (Inclusive) (#34935)``
+
+3.6.0
+.....
+
+.. note::
+  This release of provider is only available for Airflow 2.5+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+Misc
+~~~~
+
+* ``Bump min airflow version of providers (#34728)``
+
+3.5.2
+.....
+
+Bug Fixes
+~~~~~~~~~
+
+* ``fix(providers/ftp): respect soft_fail argument when exception is raised (#34161)``
+
+Misc
+~~~~
+
+* ``Consolidate importing of os.path.* (#34060)``
+* ``Refactor regex in providers (#33898)``
+
+3.5.1
+.....
+
+Misc
+~~~~
+
+* ``Refactor: Remove useless str() calls (#33629)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``D205 Support - Providers - Final Pass (#33303)``
+
+3.5.0
+.....
+
+Features
+~~~~~~~~
+
+* ``openlineage, ftp: add OpenLineage support for FTPFileTransferOperator (#31354)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Prepare docs for July 2023 wave of Providers (RC2) (#32381)``
+   * ``Remove spurious headers for provider changelogs (#32373)``
+   * ``Prepare docs for July 2023 wave of Providers (#32298)``
+   * ``D205 Support - Providers: Databricks to Github (inclusive) (#32243)``
+   * ``Improve provider documentation and README structure (#32125)``
+
+3.4.2
+.....
+
+.. note::
+  This release dropped support for Python 3.7
+
+Misc
+~~~~
+
+* ``Remove Python 3.7 support (#30963)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Add D400 pydocstyle check - Providers (#31427)``
+   * ``Add note about dropping Python 3.7 for providers (#32015)``
+
+3.4.1
+.....
+
+Misc
+~~~~
+
+* ``Bring back min-airflow-version for preinstalled providers (#31469)``
+
+3.4.0 (YANKED)
+..............
+
+.. warning:: This release has been **yanked** with a reason: ``This version might cause unconstrained installation of old airflow version lead to Runtime Error.``
+
+.. note::
+  This release of provider is only available for Airflow 2.4+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Add full automation for min Airflow version for providers (#30994)``
+   * ``Add mechanism to suspend providers (#30422)``
+   * ``Use '__version__' in providers not 'version' (#31393)``
+   * ``Fixing circular import error in providers caused by airflow version check (#31379)``
+   * ``Prepare docs for May 2023 wave of Providers (#31252)``
+
+3.3.1
+.....
+
+Bug Fixes
+~~~~~~~~~
+
+* ``FTP operator has logic in __init__ (#29073)``
+
+3.3.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add FTPSFileTransmitOperator (#28318)``
+* ``Add 'FTPFileTransmitOperator' (#26974)``
+
+3.2.0
+.....
+
+.. note::
+  This release of provider is only available for Airflow 2.3+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+Misc
+~~~~
+
+* ``Move min airflow version to 2.3.0 for all providers (#27196)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Enable string normalization in python formatting - providers (#27205)``
+   * ``Update docs for September Provider's release (#26731)``
+   * ``Apply PEP-563 (Postponed Evaluation of Annotations) to non-core airflow (#26289)``
+
+3.1.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add blocksize arg for ftp hook (#24860)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Move provider dependencies to inside provider folders (#24672)``
+   * ``Remove 'hook-class-names' from provider.yaml (#24702)``
 
 3.0.0
 .....
@@ -30,14 +265,16 @@ Changelog
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
-* This release of provider is only available for Airflow 2.2+ as explained in the Apache Airflow
-  providers support policy https://github.com/apache/airflow/blob/main/README.md#support-for-providers
+.. note::
+  This release of provider is only available for Airflow 2.2+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
 
 
 .. Below changes are excluded from the changelog. Move them to
    appropriate section above if needed. Do not delete the lines(!):
    * ``Add explanatory note for contributors about updating Changelog (#24229)``
    * ``Prepare docs for May 2022 provider's release (#24231)``
+   * ``Update package description to remove double min-airflow specification (#24292)``
 
 2.1.2
 .....

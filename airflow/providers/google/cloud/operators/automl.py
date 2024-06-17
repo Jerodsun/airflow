@@ -15,14 +15,16 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
-
 """This module contains Google AutoML operators."""
+
+from __future__ import annotations
+
 import ast
-from typing import TYPE_CHECKING, Dict, List, Optional, Sequence, Tuple, Union
+import warnings
+from functools import cached_property
+from typing import TYPE_CHECKING, Sequence, Tuple
 
 from google.api_core.gapic_v1.method import DEFAULT, _MethodDefault
-from google.api_core.retry import Retry
 from google.cloud.automl_v1beta1 import (
     BatchPredictResult,
     ColumnSpec,
@@ -32,18 +34,58 @@ from google.cloud.automl_v1beta1 import (
     TableSpec,
 )
 
-from airflow.models import BaseOperator
+from airflow.exceptions import AirflowException
 from airflow.providers.google.cloud.hooks.automl import CloudAutoMLHook
+from airflow.providers.google.cloud.hooks.vertex_ai.prediction_service import PredictionServiceHook
+from airflow.providers.google.cloud.links.translate import (
+    TranslationDatasetListLink,
+    TranslationLegacyDatasetLink,
+    TranslationLegacyModelLink,
+    TranslationLegacyModelPredictLink,
+    TranslationLegacyModelTrainLink,
+)
+from airflow.providers.google.cloud.operators.cloud_base import GoogleCloudBaseOperator
+from airflow.providers.google.common.hooks.base_google import PROVIDE_PROJECT_ID
 
 if TYPE_CHECKING:
+    from google.api_core.retry import Retry
+
     from airflow.utils.context import Context
 
 MetaData = Sequence[Tuple[str, str]]
 
 
-class AutoMLTrainModelOperator(BaseOperator):
+def _raise_exception_for_deprecated_operator(
+    deprecated_class_name: str, alternative_class_names: str | list[str]
+):
+    if isinstance(alternative_class_names, str):
+        alternative_class_name_str = alternative_class_names
+    elif len(alternative_class_names) == 1:
+        alternative_class_name_str = alternative_class_names[0]
+    else:
+        alternative_class_name_str = ", ".join(f"`{cls_name}`" for cls_name in alternative_class_names[:-1])
+        alternative_class_name_str += f" or `{alternative_class_names[-1]}`"
+
+    raise AirflowException(
+        f"{deprecated_class_name} for text, image, and video prediction has been "
+        f"deprecated and no longer available. All the functionality of "
+        f"legacy AutoML Natural Language, Vision, Video Intelligence and Tables "
+        f"and new features are available on the Vertex AI platform. "
+        f"Please use {alternative_class_name_str} from Vertex AI."
+    )
+
+
+class AutoMLTrainModelOperator(GoogleCloudBaseOperator):
     """
     Creates Google Cloud AutoML model.
+
+    AutoMLTrainModelOperator for tables, video intelligence, vision and natural language has been deprecated
+    and no longer available. Please use
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.auto_ml.CreateAutoMLTabularTrainingJobOperator`,
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.auto_ml.CreateAutoMLVideoTrainingJobOperator`,
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.auto_ml.CreateAutoMLImageTrainingJobOperator`,
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.auto_ml.CreateAutoMLTextTrainingJobOperator`,
+    instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -75,22 +117,25 @@ class AutoMLTrainModelOperator(BaseOperator):
         "project_id",
         "impersonation_chain",
     )
+    operator_extra_links = (
+        TranslationLegacyModelTrainLink(),
+        TranslationLegacyModelLink(),
+    )
 
     def __init__(
         self,
         *,
         model: dict,
         location: str,
-        project_id: Optional[str] = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-
         self.model = model
         self.location = location
         self.project_id = project_id
@@ -100,12 +145,23 @@ class AutoMLTrainModelOperator(BaseOperator):
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
+        # Raise exception if running not AutoML Translation prediction job
+        if "translation_model_metadata" not in self.model:
+            _raise_exception_for_deprecated_operator(
+                self.__class__.__name__,
+                [
+                    "CreateAutoMLTabularTrainingJobOperator",
+                    "CreateAutoMLVideoTrainingJobOperator",
+                    "CreateAutoMLImageTrainingJobOperator",
+                    "CreateAutoMLTextTrainingJobOperator",
+                ],
+            )
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
         )
-        self.log.info("Creating model.")
+        self.log.info("Creating model %s...", self.model["display_name"])
         operation = hook.create_model(
             model=self.model,
             location=self.location,
@@ -114,24 +170,42 @@ class AutoMLTrainModelOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
-        result = Model.to_dict(operation.result())
+        project_id = self.project_id or hook.project_id
+        if project_id:
+            TranslationLegacyModelTrainLink.persist(
+                context=context, task_instance=self, project_id=project_id
+            )
+        operation_result = hook.wait_for_operation(timeout=self.timeout, operation=operation)
+        result = Model.to_dict(operation_result)
         model_id = hook.extract_object_id(result)
-        self.log.info("Model created: %s", model_id)
+        self.log.info("Model is created, model_id: %s", model_id)
 
         self.xcom_push(context, key="model_id", value=model_id)
+        if project_id:
+            TranslationLegacyModelLink.persist(
+                context=context,
+                task_instance=self,
+                dataset_id=self.model["dataset_id"] or "-",
+                model_id=model_id,
+                project_id=project_id,
+            )
         return result
 
 
-class AutoMLPredictOperator(BaseOperator):
+class AutoMLPredictOperator(GoogleCloudBaseOperator):
     """
     Runs prediction operation on Google Cloud AutoML.
+
+    AutoMLPredictOperator for text, image, and video prediction has been deprecated.
+    Please use endpoint_id param instead of model_id param.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
         :ref:`howto/operator:AutoMLPredictOperator`
 
     :param model_id: Name of the model requested to serve the batch prediction.
-    :param payload: Name od the model used for the prediction.
+    :param endpoint_id: Name of the endpoint used for the prediction.
+    :param payload: Name of the model used for the prediction.
     :param project_id: ID of the Google Cloud project where model is located if None then
         default project_id is used.
     :param location: The location of the project.
@@ -158,26 +232,31 @@ class AutoMLPredictOperator(BaseOperator):
         "project_id",
         "impersonation_chain",
     )
+    operator_extra_links = (TranslationLegacyModelPredictLink(),)
 
     def __init__(
         self,
         *,
-        model_id: str,
+        model_id: str | None = None,
+        endpoint_id: str | None = None,
         location: str,
         payload: dict,
-        operation_params: Optional[Dict[str, str]] = None,
-        project_id: Optional[str] = None,
+        operation_params: dict[str, str] | None = None,
+        instances: list[str] | None = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
 
         self.model_id = model_id
+        self.endpoint_id = endpoint_id
         self.operation_params = operation_params  # type: ignore
+        self.instances = instances
         self.location = location
         self.project_id = project_id
         self.metadata = metadata
@@ -187,27 +266,89 @@ class AutoMLPredictOperator(BaseOperator):
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
 
-    def execute(self, context: 'Context'):
-        hook = CloudAutoMLHook(
-            gcp_conn_id=self.gcp_conn_id,
-            impersonation_chain=self.impersonation_chain,
-        )
-        result = hook.predict(
+    @cached_property
+    def hook(self) -> CloudAutoMLHook | PredictionServiceHook:
+        if self.model_id:
+            return CloudAutoMLHook(
+                gcp_conn_id=self.gcp_conn_id,
+                impersonation_chain=self.impersonation_chain,
+            )
+        else:  # endpoint_id defined
+            return PredictionServiceHook(
+                gcp_conn_id=self.gcp_conn_id,
+                impersonation_chain=self.impersonation_chain,
+            )
+
+    def _check_model_type(self):
+        hook = self.hook
+        model = hook.get_model(
             model_id=self.model_id,
-            payload=self.payload,
             location=self.location,
             project_id=self.project_id,
-            params=self.operation_params,
             retry=self.retry,
             timeout=self.timeout,
             metadata=self.metadata,
         )
+        if not hasattr(model, "translation_model_metadata"):
+            raise AirflowException(
+                "AutoMLPredictOperator for text, image, and video prediction has been deprecated. "
+                "Please use endpoint_id param instead of model_id param."
+            )
+
+    def execute(self, context: Context):
+        if self.model_id is None and self.endpoint_id is None:
+            raise AirflowException("You must specify model_id or endpoint_id!")
+
+        if self.model_id:
+            self._check_model_type()
+
+        hook = self.hook
+        if self.model_id:
+            result = hook.predict(
+                model_id=self.model_id,
+                payload=self.payload,
+                location=self.location,
+                project_id=self.project_id,
+                params=self.operation_params,
+                retry=self.retry,
+                timeout=self.timeout,
+                metadata=self.metadata,
+            )
+        else:  # self.endpoint_id is defined
+            result = hook.predict(
+                endpoint_id=self.endpoint_id,
+                instances=self.instances,
+                payload=self.payload,
+                location=self.location,
+                project_id=self.project_id,
+                parameters=self.operation_params,
+                retry=self.retry,
+                timeout=self.timeout,
+                metadata=self.metadata,
+            )
+
+        project_id = self.project_id or hook.project_id
+        if project_id and self.model_id:
+            TranslationLegacyModelPredictLink.persist(
+                context=context,
+                task_instance=self,
+                model_id=self.model_id,
+                project_id=project_id,
+            )
         return PredictResponse.to_dict(result)
 
 
-class AutoMLBatchPredictOperator(BaseOperator):
+class AutoMLBatchPredictOperator(GoogleCloudBaseOperator):
     """
     Perform a batch prediction on Google Cloud AutoML.
+
+    AutoMLBatchPredictOperator for tables, video intelligence, vision and natural language has been deprecated
+    and no longer available. Please use
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.batch_prediction_job.CreateBatchPredictionJobOperator`,
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.batch_prediction_job.GetBatchPredictionJobOperator`,
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.batch_prediction_job.ListBatchPredictionJobsOperator`,
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.batch_prediction_job.DeleteBatchPredictionJobOperator`,
+    instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -252,6 +393,7 @@ class AutoMLBatchPredictOperator(BaseOperator):
         "project_id",
         "impersonation_chain",
     )
+    operator_extra_links = (TranslationLegacyModelPredictLink(),)
 
     def __init__(
         self,
@@ -260,13 +402,13 @@ class AutoMLBatchPredictOperator(BaseOperator):
         input_config: dict,
         output_config: dict,
         location: str,
-        project_id: Optional[str] = None,
-        prediction_params: Optional[Dict[str, str]] = None,
+        project_id: str = PROVIDE_PROJECT_ID,
+        prediction_params: dict[str, str] | None = None,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -283,11 +425,30 @@ class AutoMLBatchPredictOperator(BaseOperator):
         self.input_config = input_config
         self.output_config = output_config
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
         )
+        self.model: Model = hook.get_model(
+            model_id=self.model_id,
+            location=self.location,
+            project_id=self.project_id,
+            retry=self.retry,
+            timeout=self.timeout,
+            metadata=self.metadata,
+        )
+
+        if not hasattr(self.model, "translation_model_metadata"):
+            _raise_exception_for_deprecated_operator(
+                self.__class__.__name__,
+                [
+                    "CreateBatchPredictionJobOperator",
+                    "GetBatchPredictionJobOperator",
+                    "ListBatchPredictionJobsOperator",
+                    "DeleteBatchPredictionJobOperator",
+                ],
+            )
         self.log.info("Fetch batch prediction.")
         operation = hook.batch_predict(
             model_id=self.model_id,
@@ -300,14 +461,27 @@ class AutoMLBatchPredictOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
-        result = BatchPredictResult.to_dict(operation.result())
-        self.log.info("Batch prediction ready.")
+        operation_result = hook.wait_for_operation(timeout=self.timeout, operation=operation)
+        result = BatchPredictResult.to_dict(operation_result)
+        self.log.info("Batch prediction is ready.")
+        project_id = self.project_id or hook.project_id
+        if project_id:
+            TranslationLegacyModelPredictLink.persist(
+                context=context,
+                task_instance=self,
+                model_id=self.model_id,
+                project_id=project_id,
+            )
         return result
 
 
-class AutoMLCreateDatasetOperator(BaseOperator):
+class AutoMLCreateDatasetOperator(GoogleCloudBaseOperator):
     """
     Creates a Google Cloud AutoML dataset.
+
+    AutoMLCreateDatasetOperator for tables, video intelligence, vision and natural language has been
+    deprecated and no longer available. Please use
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.dataset.CreateDatasetOperator` instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -341,18 +515,19 @@ class AutoMLCreateDatasetOperator(BaseOperator):
         "project_id",
         "impersonation_chain",
     )
+    operator_extra_links = (TranslationLegacyDatasetLink(),)
 
     def __init__(
         self,
         *,
         dataset: dict,
         location: str,
-        project_id: Optional[str] = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -366,12 +541,14 @@ class AutoMLCreateDatasetOperator(BaseOperator):
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
+        if "translation_dataset_metadata" not in self.dataset:
+            _raise_exception_for_deprecated_operator(self.__class__.__name__, "CreateDatasetOperator")
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
         )
-        self.log.info("Creating dataset")
+        self.log.info("Creating dataset %s...", self.dataset)
         result = hook.create_dataset(
             dataset=self.dataset,
             location=self.location,
@@ -385,12 +562,24 @@ class AutoMLCreateDatasetOperator(BaseOperator):
         self.log.info("Creating completed. Dataset id: %s", dataset_id)
 
         self.xcom_push(context, key="dataset_id", value=dataset_id)
+        project_id = self.project_id or hook.project_id
+        if project_id:
+            TranslationLegacyDatasetLink.persist(
+                context=context,
+                task_instance=self,
+                dataset_id=dataset_id,
+                project_id=project_id,
+            )
         return result
 
 
-class AutoMLImportDataOperator(BaseOperator):
+class AutoMLImportDataOperator(GoogleCloudBaseOperator):
     """
     Imports data to a Google Cloud AutoML dataset.
+
+    AutoMLImportDataOperator for tables, video intelligence, vision and natural language has been deprecated
+    and no longer available. Please use
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.dataset.ImportDataOperator` instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -426,6 +615,7 @@ class AutoMLImportDataOperator(BaseOperator):
         "project_id",
         "impersonation_chain",
     )
+    operator_extra_links = (TranslationLegacyDatasetLink(),)
 
     def __init__(
         self,
@@ -433,12 +623,12 @@ class AutoMLImportDataOperator(BaseOperator):
         dataset_id: str,
         location: str,
         input_config: dict,
-        project_id: Optional[str] = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -453,12 +643,22 @@ class AutoMLImportDataOperator(BaseOperator):
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
         )
-        self.log.info("Importing dataset")
+        dataset: Dataset = hook.get_dataset(
+            dataset_id=self.dataset_id,
+            location=self.location,
+            project_id=self.project_id,
+            retry=self.retry,
+            timeout=self.timeout,
+            metadata=self.metadata,
+        )
+        if not hasattr(dataset, "translation_dataset_metadata"):
+            _raise_exception_for_deprecated_operator(self.__class__.__name__, "ImportDataOperator")
+        self.log.info("Importing data to dataset...")
         operation = hook.import_data(
             dataset_id=self.dataset_id,
             input_config=self.input_config,
@@ -468,13 +668,25 @@ class AutoMLImportDataOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
-        operation.result()
-        self.log.info("Import completed")
+        hook.wait_for_operation(timeout=self.timeout, operation=operation)
+        self.log.info("Import is completed")
+        project_id = self.project_id or hook.project_id
+        if project_id:
+            TranslationLegacyDatasetLink.persist(
+                context=context,
+                task_instance=self,
+                dataset_id=self.dataset_id,
+                project_id=project_id,
+            )
 
 
-class AutoMLTablesListColumnSpecsOperator(BaseOperator):
+class AutoMLTablesListColumnSpecsOperator(GoogleCloudBaseOperator):
     """
     Lists column specs in a table.
+
+    Operator AutoMLTablesListColumnSpecsOperator has been deprecated due to shutdown of
+    a legacy version of AutoML Tables on March 31, 2024. For additional information
+    see: https://cloud.google.com/automl-tables/docs/deprecations.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -518,6 +730,7 @@ class AutoMLTablesListColumnSpecsOperator(BaseOperator):
         "project_id",
         "impersonation_chain",
     )
+    operator_extra_links = (TranslationLegacyDatasetLink(),)
 
     def __init__(
         self,
@@ -525,15 +738,15 @@ class AutoMLTablesListColumnSpecsOperator(BaseOperator):
         dataset_id: str,
         table_spec_id: str,
         location: str,
-        field_mask: Optional[dict] = None,
-        filter_: Optional[str] = None,
-        page_size: Optional[int] = None,
-        project_id: Optional[str] = None,
+        field_mask: dict | None = None,
+        filter_: str | None = None,
+        page_size: int | None = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -549,8 +762,13 @@ class AutoMLTablesListColumnSpecsOperator(BaseOperator):
         self.retry = retry
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
+        raise AirflowException(
+            "Operator AutoMLTablesListColumnSpecsOperator has been deprecated due to shutdown of "
+            "a legacy version of AutoML Tables on March 31, 2024. "
+            "For additional information see: https://cloud.google.com/automl-tables/docs/deprecations."
+        )
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
@@ -570,13 +788,26 @@ class AutoMLTablesListColumnSpecsOperator(BaseOperator):
         )
         result = [ColumnSpec.to_dict(spec) for spec in page_iterator]
         self.log.info("Columns specs obtained.")
-
+        project_id = self.project_id or hook.project_id
+        if project_id:
+            TranslationLegacyDatasetLink.persist(
+                context=context,
+                task_instance=self,
+                dataset_id=self.dataset_id,
+                project_id=project_id,
+            )
         return result
 
 
-class AutoMLTablesUpdateDatasetOperator(BaseOperator):
+class AutoMLTablesUpdateDatasetOperator(GoogleCloudBaseOperator):
     """
     Updates a dataset.
+
+    Operator AutoMLTablesUpdateDatasetOperator has been deprecated due to shutdown of
+    a legacy version of AutoML Tables on March 31, 2024. For additional information
+    see: https://cloud.google.com/automl-tables/docs/deprecations.
+    Please use :class:`airflow.providers.google.cloud.operators.vertex_ai.dataset.UpdateDatasetOperator`
+    instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -610,18 +841,19 @@ class AutoMLTablesUpdateDatasetOperator(BaseOperator):
         "location",
         "impersonation_chain",
     )
+    operator_extra_links = (TranslationLegacyDatasetLink(),)
 
     def __init__(
         self,
         *,
         dataset: dict,
         location: str,
-        update_mask: Optional[dict] = None,
+        update_mask: dict | None = None,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -634,8 +866,14 @@ class AutoMLTablesUpdateDatasetOperator(BaseOperator):
         self.retry = retry
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
+        raise AirflowException(
+            "Operator AutoMLTablesUpdateDatasetOperator has been deprecated due to shutdown of "
+            "a legacy version of AutoML Tables on March 31, 2024. "
+            "For additional information see: https://cloud.google.com/automl-tables/docs/deprecations. "
+            "Please use UpdateDatasetOperator from Vertex AI instead."
+        )
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
@@ -649,12 +887,24 @@ class AutoMLTablesUpdateDatasetOperator(BaseOperator):
             metadata=self.metadata,
         )
         self.log.info("Dataset updated.")
+        project_id = hook.project_id
+        if project_id:
+            TranslationLegacyDatasetLink.persist(
+                context=context,
+                task_instance=self,
+                dataset_id=hook.extract_object_id(self.dataset),
+                project_id=project_id,
+            )
         return Dataset.to_dict(result)
 
 
-class AutoMLGetModelOperator(BaseOperator):
+class AutoMLGetModelOperator(GoogleCloudBaseOperator):
     """
     Get Google Cloud AutoML model.
+
+    AutoMLGetModelOperator for tables, video intelligence, vision and natural language has been deprecated
+    and no longer available. Please use
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.model_service.GetModelOperator` instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -687,18 +937,19 @@ class AutoMLGetModelOperator(BaseOperator):
         "project_id",
         "impersonation_chain",
     )
+    operator_extra_links = (TranslationLegacyModelLink(),)
 
     def __init__(
         self,
         *,
         model_id: str,
         location: str,
-        project_id: Optional[str] = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -712,7 +963,7 @@ class AutoMLGetModelOperator(BaseOperator):
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
@@ -725,12 +976,28 @@ class AutoMLGetModelOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
-        return Model.to_dict(result)
+        if not hasattr(result, "translation_model_metadata"):
+            _raise_exception_for_deprecated_operator(self.__class__.__name__, "GetModelOperator")
+        model = Model.to_dict(result)
+        project_id = self.project_id or hook.project_id
+        if project_id:
+            TranslationLegacyModelLink.persist(
+                context=context,
+                task_instance=self,
+                dataset_id=model["dataset_id"],
+                model_id=self.model_id,
+                project_id=project_id,
+            )
+        return model
 
 
-class AutoMLDeleteModelOperator(BaseOperator):
+class AutoMLDeleteModelOperator(GoogleCloudBaseOperator):
     """
     Delete Google Cloud AutoML model.
+
+    AutoMLDeleteModelOperator for tables, video intelligence, vision and natural language has been deprecated
+    and no longer available. Please use
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.model_service.DeleteModelOperator` instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -769,12 +1036,12 @@ class AutoMLDeleteModelOperator(BaseOperator):
         *,
         model_id: str,
         location: str,
-        project_id: Optional[str] = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -788,11 +1055,21 @@ class AutoMLDeleteModelOperator(BaseOperator):
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
         )
+        model: Model = hook.get_model(
+            model_id=self.model_id,
+            location=self.location,
+            project_id=self.project_id,
+            retry=self.retry,
+            timeout=self.timeout,
+            metadata=self.metadata,
+        )
+        if not hasattr(model, "translation_model_metadata"):
+            _raise_exception_for_deprecated_operator(self.__class__.__name__, "DeleteModelOperator")
         operation = hook.delete_model(
             model_id=self.model_id,
             location=self.location,
@@ -801,17 +1078,25 @@ class AutoMLDeleteModelOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
-        operation.result()
+        hook.wait_for_operation(timeout=self.timeout, operation=operation)
+        self.log.info("Deletion is completed")
 
 
-class AutoMLDeployModelOperator(BaseOperator):
+class AutoMLDeployModelOperator(GoogleCloudBaseOperator):
     """
-    Deploys a model. If a model is already deployed, deploying it with the same parameters
-    has no effect. Deploying with different parameters (as e.g. changing node_number) will
-    reset the deployment state without pausing the model_id’s availability.
+    Deploys a model; if a model is already deployed, deploying it with the same parameters has no effect.
+
+    Deploying with different parameters (as e.g. changing node_number) will
+    reset the deployment state without pausing the model_id's availability.
 
     Only applicable for Text Classification, Image Object Detection and Tables; all other
     domains manage deployment automatically.
+
+    Operator AutoMLDeployModelOperator has been deprecated due to shutdown of a legacy version
+    of AutoML Natural Language, Vision, Video Intelligence on March 31, 2024.
+    For additional information see: https://cloud.google.com/vision/automl/docs/deprecations .
+    Please use :class:`airflow.providers.google.cloud.operators.vertex_ai.endpoint_service.DeployModelOperator`
+    instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -853,13 +1138,13 @@ class AutoMLDeployModelOperator(BaseOperator):
         *,
         model_id: str,
         location: str,
-        project_id: Optional[str] = None,
-        image_detection_metadata: Optional[dict] = None,
-        metadata: Sequence[Tuple[str, str]] = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        project_id: str = PROVIDE_PROJECT_ID,
+        image_detection_metadata: dict | None = None,
+        metadata: Sequence[tuple[str, str]] = (),
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -873,14 +1158,20 @@ class AutoMLDeployModelOperator(BaseOperator):
         self.retry = retry
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
+        raise AirflowException(
+            "Operator AutoMLDeployModelOperator has been deprecated due to shutdown of "
+            "a legacy version of AutoML AutoML Natural Language, Vision, Video Intelligence "
+            "on March 31, 2024. "
+            "For additional information see: https://cloud.google.com/vision/automl/docs/deprecations. "
+            "Please use DeployModelOperator from Vertex AI instead."
+        )
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
         )
         self.log.info("Deploying model_id %s", self.model_id)
-
         operation = hook.deploy_model(
             model_id=self.model_id,
             location=self.location,
@@ -890,13 +1181,17 @@ class AutoMLDeployModelOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
-        operation.result()
-        self.log.info("Model deployed.")
+        hook.wait_for_operation(timeout=self.timeout, operation=operation)
+        self.log.info("Model was deployed successfully.")
 
 
-class AutoMLTablesListTableSpecsOperator(BaseOperator):
+class AutoMLTablesListTableSpecsOperator(GoogleCloudBaseOperator):
     """
     Lists table specs in a dataset.
+
+    Operator AutoMLTablesListTableSpecsOperator has been deprecated due to shutdown of
+    a legacy version of AutoML Tables on March 31, 2024. For additional information
+    see: https://cloud.google.com/automl-tables/docs/deprecations.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -935,20 +1230,21 @@ class AutoMLTablesListTableSpecsOperator(BaseOperator):
         "project_id",
         "impersonation_chain",
     )
+    operator_extra_links = (TranslationLegacyDatasetLink(),)
 
     def __init__(
         self,
         *,
         dataset_id: str,
         location: str,
-        page_size: Optional[int] = None,
-        filter_: Optional[str] = None,
-        project_id: Optional[str] = None,
+        page_size: int | None = None,
+        filter_: str | None = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -962,8 +1258,13 @@ class AutoMLTablesListTableSpecsOperator(BaseOperator):
         self.retry = retry
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
+        raise AirflowException(
+            "Operator AutoMLTablesListTableSpecsOperator has been deprecated due to shutdown of "
+            "a legacy version of AutoML Tables on March 31, 2024. "
+            "For additional information see: https://cloud.google.com/automl-tables/docs/deprecations. "
+        )
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
@@ -982,12 +1283,24 @@ class AutoMLTablesListTableSpecsOperator(BaseOperator):
         result = [TableSpec.to_dict(spec) for spec in page_iterator]
         self.log.info(result)
         self.log.info("Table specs obtained.")
+        project_id = self.project_id or hook.project_id
+        if project_id:
+            TranslationLegacyDatasetLink.persist(
+                context=context,
+                task_instance=self,
+                dataset_id=self.dataset_id,
+                project_id=project_id,
+            )
         return result
 
 
-class AutoMLListDatasetOperator(BaseOperator):
+class AutoMLListDatasetOperator(GoogleCloudBaseOperator):
     """
     Lists AutoML Datasets in project.
+
+    AutoMLListDatasetOperator for tables, video intelligence, vision and natural language has been deprecated
+    and no longer available. Please use
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.dataset.ListDatasetsOperator` instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -1017,17 +1330,18 @@ class AutoMLListDatasetOperator(BaseOperator):
         "project_id",
         "impersonation_chain",
     )
+    operator_extra_links = (TranslationDatasetListLink(),)
 
     def __init__(
         self,
         *,
         location: str,
-        project_id: Optional[str] = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -1039,7 +1353,7 @@ class AutoMLListDatasetOperator(BaseOperator):
         self.gcp_conn_id = gcp_conn_id
         self.impersonation_chain = impersonation_chain
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
@@ -1052,7 +1366,16 @@ class AutoMLListDatasetOperator(BaseOperator):
             timeout=self.timeout,
             metadata=self.metadata,
         )
-        result = [Dataset.to_dict(dataset) for dataset in page_iterator]
+        result = []
+        for dataset in page_iterator:
+            if not hasattr(dataset, "translation_dataset_metadata"):
+                warnings.warn(
+                    "Class `AutoMLListDatasetOperator` has been deprecated and no longer available. "
+                    "Please use `ListDatasetsOperator` instead.",
+                    stacklevel=2,
+                )
+            else:
+                result.append(Dataset.to_dict(dataset))
         self.log.info("Datasets obtained.")
 
         self.xcom_push(
@@ -1060,12 +1383,19 @@ class AutoMLListDatasetOperator(BaseOperator):
             key="dataset_id_list",
             value=[hook.extract_object_id(d) for d in result],
         )
+        project_id = self.project_id or hook.project_id
+        if project_id:
+            TranslationDatasetListLink.persist(context=context, task_instance=self, project_id=project_id)
         return result
 
 
-class AutoMLDeleteDatasetOperator(BaseOperator):
+class AutoMLDeleteDatasetOperator(GoogleCloudBaseOperator):
     """
     Deletes a dataset and all of its contents.
+
+    AutoMLDeleteDatasetOperator for tables, video intelligence, vision and natural language has been
+    deprecated and no longer available. Please use
+    :class:`airflow.providers.google.cloud.operators.vertex_ai.dataset.DeleteDatasetOperator` instead.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -1102,14 +1432,14 @@ class AutoMLDeleteDatasetOperator(BaseOperator):
     def __init__(
         self,
         *,
-        dataset_id: Union[str, List[str]],
+        dataset_id: str | list[str],
         location: str,
-        project_id: Optional[str] = None,
+        project_id: str = PROVIDE_PROJECT_ID,
         metadata: MetaData = (),
-        timeout: Optional[float] = None,
-        retry: Union[Retry, _MethodDefault] = DEFAULT,
+        timeout: float | None = None,
+        retry: Retry | _MethodDefault = DEFAULT,
         gcp_conn_id: str = "google_cloud_default",
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
@@ -1124,7 +1454,7 @@ class AutoMLDeleteDatasetOperator(BaseOperator):
         self.impersonation_chain = impersonation_chain
 
     @staticmethod
-    def _parse_dataset_id(dataset_id: Union[str, List[str]]) -> List[str]:
+    def _parse_dataset_id(dataset_id: str | list[str]) -> list[str]:
         if not isinstance(dataset_id, str):
             return dataset_id
         try:
@@ -1132,11 +1462,21 @@ class AutoMLDeleteDatasetOperator(BaseOperator):
         except (SyntaxError, ValueError):
             return dataset_id.split(",")
 
-    def execute(self, context: 'Context'):
+    def execute(self, context: Context):
         hook = CloudAutoMLHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
         )
+        dataset: Dataset = hook.get_dataset(
+            dataset_id=self.dataset_id,
+            location=self.location,
+            project_id=self.project_id,
+            retry=self.retry,
+            timeout=self.timeout,
+            metadata=self.metadata,
+        )
+        if not hasattr(dataset, "translation_dataset_metadata"):
+            _raise_exception_for_deprecated_operator(self.__class__.__name__, "DeleteDatasetOperator")
         dataset_id_list = self._parse_dataset_id(self.dataset_id)
         for dataset_id in dataset_id_list:
             self.log.info("Deleting dataset %s", dataset_id)

@@ -21,7 +21,26 @@ name: Salesforce
 description: |
     `Salesforce <https://www.salesforce.com/>`__
 
+state: ready
+source-date-epoch: 1716288990
+# note that those versions are maintained by release manager - do not update them manually
 versions:
+  - 5.7.1
+  - 5.7.0
+  - 5.6.3
+  - 5.6.2
+  - 5.6.1
+  - 5.6.0
+  - 5.5.1
+  - 5.5.0
+  - 5.4.3
+  - 5.4.2
+  - 5.4.1
+  - 5.4.0
+  - 5.3.0
+  - 5.2.0
+  - 5.1.0
+  - 5.0.0
   - 4.0.0
   - 3.4.4
   - 3.4.3
@@ -36,14 +55,23 @@ versions:
   - 1.0.1
   - 1.0.0
 
-additional-dependencies:
-  - apache-airflow>=2.2.0
+dependencies:
+  - apache-airflow>=2.7.0
+  - simple-salesforce>=1.0.0
+  # In pandas 2.2 minimal version of the sqlalchemy is 2.0
+  # https://pandas.pydata.org/docs/whatsnew/v2.2.0.html#increased-minimum-versions-for-dependencies
+  # However Airflow not fully supports it yet: https://github.com/apache/airflow/issues/28723
+  # In addition FAB also limit sqlalchemy to < 2.0
+  - pandas>=2.1.2,<2.2;python_version>="3.9"
+  - pandas>=1.5.3,<2.2;python_version<"3.9"
+
 
 integrations:
   - integration-name: Salesforce
     external-doc-url: https://www.salesforce.com/
     how-to-guide:
       - /docs/apache-airflow-providers-salesforce/operators/salesforce_apex_rest.rst
+      - /docs/apache-airflow-providers-salesforce/operators/bulk.rst
     logo: /integration-logos/salesforce/Salesforce.png
     tags: [service]
 
@@ -51,23 +79,12 @@ operators:
   - integration-name: Salesforce
     python-modules:
       - airflow.providers.salesforce.operators.salesforce_apex_rest
-      - airflow.providers.salesforce.operators.tableau_refresh_workbook
-
-sensors:
-  - integration-name: Salesforce
-    python-modules:
-      - airflow.providers.salesforce.sensors.tableau_job_status
+      - airflow.providers.salesforce.operators.bulk
 
 hooks:
-  - integration-name: Tableau
-    python-modules:
-      - airflow.providers.salesforce.hooks.tableau
   - integration-name: Salesforce
     python-modules:
       - airflow.providers.salesforce.hooks.salesforce
-
-hook-class-names:  # deprecated - to be removed after providers add dependency on Airflow 2.2.0+
-  - airflow.providers.salesforce.hooks.salesforce.SalesforceHook
 
 connection-types:
   - hook-class-name: airflow.providers.salesforce.hooks.salesforce.SalesforceHook

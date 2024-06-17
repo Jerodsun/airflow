@@ -14,10 +14,15 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
+
 from contextlib import contextmanager
 
 from airflow.api_connexion.exceptions import EXCEPTIONS_LINK_MAP
-from airflow.www.security import EXISTING_ROLES
+from tests.test_utils.compat import ignore_provider_compatibility_error
+
+with ignore_provider_compatibility_error("2.9.0+", __file__):
+    from airflow.providers.fab.auth_manager.security_manager.override import EXISTING_ROLES
 
 
 @contextmanager
@@ -120,8 +125,8 @@ def delete_users(app):
 def assert_401(response):
     assert response.status_code == 401, f"Current code: {response.status_code}"
     assert response.json == {
-        'detail': None,
-        'status': 401,
-        'title': 'Unauthorized',
-        'type': EXCEPTIONS_LINK_MAP[401],
+        "detail": None,
+        "status": 401,
+        "title": "Unauthorized",
+        "type": EXCEPTIONS_LINK_MAP[401],
     }

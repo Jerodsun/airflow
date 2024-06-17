@@ -16,15 +16,19 @@
 # specific language governing permissions and limitations
 # under the License.
 """This module contains Google Cloud Bigtable sensor."""
-from typing import TYPE_CHECKING, Optional, Sequence, Union
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Sequence
 
 import google.api_core.exceptions
+from google.cloud.bigtable import enums
 from google.cloud.bigtable.table import ClusterState
-from google.cloud.bigtable_admin_v2 import enums
 
 from airflow.providers.google.cloud.hooks.bigtable import BigtableHook
 from airflow.providers.google.cloud.links.bigtable import BigtableTablesLink
 from airflow.providers.google.cloud.operators.bigtable import BigtableValidationMixin
+from airflow.providers.google.common.hooks.base_google import PROVIDE_PROJECT_ID
 from airflow.sensors.base import BaseSensorOperator
 
 if TYPE_CHECKING:
@@ -34,6 +38,7 @@ if TYPE_CHECKING:
 class BigtableTableReplicationCompletedSensor(BaseSensorOperator, BigtableValidationMixin):
     """
     Sensor that waits for Cloud Bigtable table to be fully replicated to its clusters.
+
     No exception will be raised if the instance or the table does not exist.
 
     For more details about cluster states for a table, have a look at the reference:
@@ -56,12 +61,12 @@ class BigtableTableReplicationCompletedSensor(BaseSensorOperator, BigtableValida
         account from the list granting this role to the originating account (templated).
     """
 
-    REQUIRED_ATTRIBUTES = ('instance_id', 'table_id')
+    REQUIRED_ATTRIBUTES = ("instance_id", "table_id")
     template_fields: Sequence[str] = (
-        'project_id',
-        'instance_id',
-        'table_id',
-        'impersonation_chain',
+        "project_id",
+        "instance_id",
+        "table_id",
+        "impersonation_chain",
     )
     operator_extra_links = (BigtableTablesLink(),)
 
@@ -70,9 +75,9 @@ class BigtableTableReplicationCompletedSensor(BaseSensorOperator, BigtableValida
         *,
         instance_id: str,
         table_id: str,
-        project_id: Optional[str] = None,
-        gcp_conn_id: str = 'google_cloud_default',
-        impersonation_chain: Optional[Union[str, Sequence[str]]] = None,
+        project_id: str = PROVIDE_PROJECT_ID,
+        gcp_conn_id: str = "google_cloud_default",
+        impersonation_chain: str | Sequence[str] | None = None,
         **kwargs,
     ) -> None:
         self.project_id = project_id
@@ -83,7 +88,7 @@ class BigtableTableReplicationCompletedSensor(BaseSensorOperator, BigtableValida
         self.impersonation_chain = impersonation_chain
         super().__init__(**kwargs)
 
-    def poke(self, context: 'Context') -> bool:
+    def poke(self, context: Context) -> bool:
         hook = BigtableHook(
             gcp_conn_id=self.gcp_conn_id,
             impersonation_chain=self.impersonation_chain,
@@ -101,7 +106,7 @@ class BigtableTableReplicationCompletedSensor(BaseSensorOperator, BigtableValida
             )
             return False
 
-        ready_state = ClusterState(enums.Table.ClusterState.ReplicationState.READY)
+        ready_state = ClusterState(enums.Table.ReplicationState.READY)
 
         is_table_replicated = True
         for cluster_id in cluster_states.keys():

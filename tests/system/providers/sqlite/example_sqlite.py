@@ -16,36 +16,37 @@
 # specific language governing permissions and limitations
 # under the License.
 """
-This is an example DAG for the use of the SqliteOperator.
+This is an example DAG for the use of the SQLExecuteQueryOperator with Sqlite.
 In this example, we create two tasks that execute in sequence.
 The first task calls an sql command, defined in the SQLite operator,
 which when triggered, is performed on the connected sqlite database.
 The second task is similar but instead calls the SQL command from an external file.
 """
 
+from __future__ import annotations
+
 import os
 from datetime import datetime
 
 from airflow import DAG
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
 from airflow.providers.sqlite.hooks.sqlite import SqliteHook
-from airflow.providers.sqlite.operators.sqlite import SqliteOperator
 
 ENV_ID = os.environ.get("SYSTEM_TESTS_ENV_ID")
 DAG_ID = "example_sqlite"
 
 with DAG(
     dag_id=DAG_ID,
-    schedule_interval='@daily',
+    schedule="@daily",
     start_date=datetime(2021, 1, 1),
-    tags=['example'],
+    tags=["example"],
     catchup=False,
 ) as dag:
-
     # [START howto_operator_sqlite]
 
     # Example of creating a task that calls a common CREATE TABLE sql command.
-    create_table_sqlite_task = SqliteOperator(
-        task_id='create_table_sqlite',
+    create_table_sqlite_task = SQLExecuteQueryOperator(
+        task_id="create_table_sqlite",
         sql=r"""
         CREATE TABLE Customers (
             customer_id INT PRIMARY KEY,
@@ -61,24 +62,24 @@ with DAG(
     def insert_sqlite_hook():
         sqlite_hook = SqliteHook()
 
-        rows = [('James', '11'), ('James', '22'), ('James', '33')]
-        target_fields = ['first_name', 'last_name']
-        sqlite_hook.insert_rows(table='Customers', rows=rows, target_fields=target_fields)
+        rows = [("James", "11"), ("James", "22"), ("James", "33")]
+        target_fields = ["first_name", "last_name"]
+        sqlite_hook.insert_rows(table="Customers", rows=rows, target_fields=target_fields)
 
     @dag.task(task_id="replace_sqlite_task")
     def replace_sqlite_hook():
         sqlite_hook = SqliteHook()
 
-        rows = [('James', '11'), ('James', '22'), ('James', '33')]
-        target_fields = ['first_name', 'last_name']
-        sqlite_hook.insert_rows(table='Customers', rows=rows, target_fields=target_fields, replace=True)
+        rows = [("James", "11"), ("James", "22"), ("James", "33")]
+        target_fields = ["first_name", "last_name"]
+        sqlite_hook.insert_rows(table="Customers", rows=rows, target_fields=target_fields, replace=True)
 
     # [START howto_operator_sqlite_external_file]
 
     # Example of creating a task that calls an sql command from an external file.
-    external_create_table_sqlite_task = SqliteOperator(
-        task_id='create_table_sqlite_external_file',
-        sql='create_table.sql',
+    external_create_table_sqlite_task = SQLExecuteQueryOperator(
+        task_id="create_table_sqlite_external_file",
+        sql="create_table.sql",
     )
 
     # [END howto_operator_sqlite_external_file]

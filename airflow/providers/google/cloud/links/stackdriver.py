@@ -16,21 +16,24 @@
 # specific language governing permissions and limitations
 # under the License.
 """This module contains Google Stackdriver links."""
-from typing import TYPE_CHECKING, Optional
 
-from airflow.models import BaseOperator
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from airflow.providers.google.cloud.links.base import BaseGoogleLink
 
 if TYPE_CHECKING:
+    from airflow.models import BaseOperator
     from airflow.utils.context import Context
 
-STACKDRIVER_BASE_LINK = "https://pantheon.corp.google.com/monitoring/alerting"
+STACKDRIVER_BASE_LINK = "/monitoring/alerting"
 STACKDRIVER_NOTIFICATIONS_LINK = STACKDRIVER_BASE_LINK + "/notifications?project={project_id}"
 STACKDRIVER_POLICIES_LINK = STACKDRIVER_BASE_LINK + "/policies?project={project_id}"
 
 
 class StackdriverNotificationsLink(BaseGoogleLink):
-    """Helper class for constructing Stackdriver Notifications Link"""
+    """Helper class for constructing Stackdriver Notifications Link."""
 
     name = "Cloud Monitoring Notifications"
     key = "stackdriver_notifications"
@@ -39,8 +42,8 @@ class StackdriverNotificationsLink(BaseGoogleLink):
     @staticmethod
     def persist(
         operator_instance: BaseOperator,
-        context: "Context",
-        project_id: Optional[str],
+        context: Context,
+        project_id: str | None,
     ):
         operator_instance.xcom_push(
             context,
@@ -50,7 +53,7 @@ class StackdriverNotificationsLink(BaseGoogleLink):
 
 
 class StackdriverPoliciesLink(BaseGoogleLink):
-    """Helper class for constructing Stackdriver Policies Link"""
+    """Helper class for constructing Stackdriver Policies Link."""
 
     name = "Cloud Monitoring Policies"
     key = "stackdriver_policies"
@@ -59,8 +62,8 @@ class StackdriverPoliciesLink(BaseGoogleLink):
     @staticmethod
     def persist(
         operator_instance: BaseOperator,
-        context: "Context",
-        project_id: Optional[str],
+        context: Context,
+        project_id: str | None,
     ):
         operator_instance.xcom_push(
             context,

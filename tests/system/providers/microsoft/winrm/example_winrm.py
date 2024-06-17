@@ -15,27 +15,25 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-# --------------------------------------------------------------------------------
-# Caveat: This Dag will not run because of missing scripts.
-# The purpose of this is to give you a sample of a real world example DAG!
-# --------------------------------------------------------------------------------
+"""
+This is an example dag for using the WinRMOperator.
+"""
+
+from __future__ import annotations
 
 # --------------------------------------------------------------------------------
 # Load The Dependencies
 # --------------------------------------------------------------------------------
-"""
-This is an example dag for using the WinRMOperator.
-"""
 import os
 from datetime import datetime, timedelta
 
 from airflow import DAG
 
-try:
-    from airflow.operators.empty import EmptyOperator
-except ModuleNotFoundError:
-    from airflow.operators.dummy import DummyOperator as EmptyOperator  # type: ignore
-
+# --------------------------------------------------------------------------------
+# Caveat: This Dag will not run because of missing scripts.
+# The purpose of this is to give you a sample of a real world example DAG!
+# --------------------------------------------------------------------------------
+from airflow.operators.empty import EmptyOperator
 from airflow.providers.microsoft.winrm.hooks.winrm import WinRMHook
 from airflow.providers.microsoft.winrm.operators.winrm import WinRMOperator
 
@@ -44,25 +42,24 @@ DAG_ID = "POC_winrm_parallel"
 
 with DAG(
     dag_id=DAG_ID,
-    schedule_interval='0 0 * * *',
+    schedule="0 0 * * *",
     start_date=datetime(2021, 1, 1),
     dagrun_timeout=timedelta(minutes=60),
-    tags=['example'],
+    tags=["example"],
     catchup=False,
 ) as dag:
-
-    run_this_last = EmptyOperator(task_id='run_this_last')
+    run_this_last = EmptyOperator(task_id="run_this_last")
 
     # [START create_hook]
-    winRMHook = WinRMHook(ssh_conn_id='ssh_POC1')
+    winRMHook = WinRMHook(ssh_conn_id="ssh_POC1")
     # [END create_hook]
 
     # [START run_operator]
-    t1 = WinRMOperator(task_id="wintask1", command='ls -altr', winrm_hook=winRMHook)
+    t1 = WinRMOperator(task_id="wintask1", command="ls -altr", winrm_hook=winRMHook)
 
-    t2 = WinRMOperator(task_id="wintask2", command='sleep 60', winrm_hook=winRMHook)
+    t2 = WinRMOperator(task_id="wintask2", command="sleep 60", winrm_hook=winRMHook)
 
-    t3 = WinRMOperator(task_id="wintask3", command='echo \'luke test\' ', winrm_hook=winRMHook)
+    t3 = WinRMOperator(task_id="wintask3", command="echo 'luke test' ", winrm_hook=winRMHook)
     # [END run_operator]
 
     [t1, t2, t3] >> run_this_last

@@ -19,21 +19,37 @@
 ``apache-airflow-providers-docker``
 ===================================
 
-Content
--------
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: Basics
+
+    Home <self>
+    Changelog <changelog>
+    Security <security>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: References
 
     Connection types <connections/docker>
     Python API <_api/airflow/providers/docker/index>
+    Docker Task Decorator <decorators/docker>
+.. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: System tests
+
+    System Tests <_api/tests/system/providers/docker/index>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Resources
 
-    Example DAGs <https://github.com/apache/airflow/tree/main/tests/system/providers/docker>
+    Example DAGs <https://github.com/apache/airflow/tree/providers-docker/|version|/tests/system/providers/docker>
     PyPI Repository <https://pypi.org/project/apache-airflow-providers-docker/>
     Installing from sources <installing-providers-from-sources>
 
@@ -41,41 +57,44 @@ Content
 
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
     Detailed list of commits <commits>
 
 
-Package apache-airflow-providers-docker
+apache-airflow-providers-docker package
 ------------------------------------------------------
 
-`Docker <https://docs.docker.com/install/>`__
+`Docker <https://www.docker.com/>`__
 
 
-Release: 3.0.0
+Release: 3.12.0
 
 Provider package
 ----------------
 
-This is a provider package for ``docker`` provider. All classes for this provider package
-are in ``airflow.providers.docker`` python package.
+This package is for the ``docker`` provider.
+All classes for this package are included in the ``airflow.providers.docker`` python package.
 
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
-for the minimum Airflow version supported) via
-``pip install apache-airflow-providers-docker``
+You can install this package on top of an existing Airflow 2 installation via
+``pip install apache-airflow-providers-docker``.
+For the minimum Airflow version supported, see ``Requirements`` below.
 
 Requirements
 ------------
 
-==================  ==================
-PIP package         Version required
-==================  ==================
-``apache-airflow``  ``>=2.2.0``
-``docker``          ``>=5.0.3``
-==================  ==================
+The minimum Apache Airflow version supported by this provider package is ``2.7.0``.
 
-.. include:: ../../airflow/providers/docker/CHANGELOG.rst
+==================  ====================
+PIP package         Version required
+==================  ====================
+``apache-airflow``  ``>=2.7.0``
+``docker``          ``>=6``
+``python-dotenv``   ``>=0.21.0``
+``requests``        ``>=2.27.0,<2.32.0``
+==================  ====================

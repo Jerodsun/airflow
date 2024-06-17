@@ -15,8 +15,9 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Sequence
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Sequence
 
 from airflow.models import BaseOperator
 from airflow.providers.apache.spark.hooks.spark_submit import SparkSubmitHook
@@ -28,9 +29,7 @@ if TYPE_CHECKING:
 
 class SparkSubmitOperator(BaseOperator):
     """
-    This hook is a wrapper around the spark-submit binary to kick off a spark-submit job.
-    It requires that the "spark-submit" binary is in the PATH or the spark-home is set
-    in the extra on the connection.
+    Wrap the spark-submit binary to kick off a spark-submit job; requires "spark-submit" binary in the PATH.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -38,7 +37,7 @@ class SparkSubmitOperator(BaseOperator):
 
     :param application: The application that submitted as a job, either jar or py file. (templated)
     :param conf: Arbitrary Spark configuration properties (templated)
-    :param spark_conn_id: The :ref:`spark connection id <howto/connection:spark>` as configured
+    :param conn_id: The :ref:`spark connection id <howto/connection:spark-submit>` as configured
         in Airflow administration. When an invalid connection_id is supplied, it will default to yarn.
     :param files: Upload additional files to the executor running the job, separated by a
                   comma. Files will be placed in the working directory of each executor.
@@ -69,92 +68,110 @@ class SparkSubmitOperator(BaseOperator):
     :param env_vars: Environment variables for spark-submit. It supports yarn and k8s mode too. (templated)
     :param verbose: Whether to pass the verbose flag to spark-submit process for debugging
     :param spark_binary: The command to use for spark submit.
-                         Some distros may use spark2-submit.
+                         Some distros may use spark2-submit or spark3-submit.
+                         (will overwrite any spark_binary defined in the connection's extra JSON)
+    :param properties_file: Path to a file from which to load extra properties. If not
+                              specified, this will look for conf/spark-defaults.conf.
+    :param yarn_queue: The name of the YARN queue to which the application is submitted.
+                        (will overwrite any yarn queue defined in the connection's extra JSON)
+    :param deploy_mode: Whether to deploy your driver on the worker nodes (cluster) or locally as a client.
+                        (will overwrite any deployment mode defined in the connection's extra JSON)
+    :param use_krb5ccache: if True, configure spark to use ticket cache instead of relying
+                           on keytab for Kerberos login
     """
 
     template_fields: Sequence[str] = (
-        '_application',
-        '_conf',
-        '_files',
-        '_py_files',
-        '_jars',
-        '_driver_class_path',
-        '_packages',
-        '_exclude_packages',
-        '_keytab',
-        '_principal',
-        '_proxy_user',
-        '_name',
-        '_application_args',
-        '_env_vars',
+        "application",
+        "conf",
+        "files",
+        "py_files",
+        "jars",
+        "driver_class_path",
+        "packages",
+        "exclude_packages",
+        "keytab",
+        "principal",
+        "proxy_user",
+        "name",
+        "application_args",
+        "env_vars",
+        "properties_file",
     )
-    ui_color = WEB_COLORS['LIGHTORANGE']
+    ui_color = WEB_COLORS["LIGHTORANGE"]
 
     def __init__(
         self,
         *,
-        application: str = '',
-        conf: Optional[Dict[str, Any]] = None,
-        conn_id: str = 'spark_default',
-        files: Optional[str] = None,
-        py_files: Optional[str] = None,
-        archives: Optional[str] = None,
-        driver_class_path: Optional[str] = None,
-        jars: Optional[str] = None,
-        java_class: Optional[str] = None,
-        packages: Optional[str] = None,
-        exclude_packages: Optional[str] = None,
-        repositories: Optional[str] = None,
-        total_executor_cores: Optional[int] = None,
-        executor_cores: Optional[int] = None,
-        executor_memory: Optional[str] = None,
-        driver_memory: Optional[str] = None,
-        keytab: Optional[str] = None,
-        principal: Optional[str] = None,
-        proxy_user: Optional[str] = None,
-        name: str = 'arrow-spark',
-        num_executors: Optional[int] = None,
+        application: str = "",
+        conf: dict[str, Any] | None = None,
+        conn_id: str = "spark_default",
+        files: str | None = None,
+        py_files: str | None = None,
+        archives: str | None = None,
+        driver_class_path: str | None = None,
+        jars: str | None = None,
+        java_class: str | None = None,
+        packages: str | None = None,
+        exclude_packages: str | None = None,
+        repositories: str | None = None,
+        total_executor_cores: int | None = None,
+        executor_cores: int | None = None,
+        executor_memory: str | None = None,
+        driver_memory: str | None = None,
+        keytab: str | None = None,
+        principal: str | None = None,
+        proxy_user: str | None = None,
+        name: str = "arrow-spark",
+        num_executors: int | None = None,
         status_poll_interval: int = 1,
-        application_args: Optional[List[Any]] = None,
-        env_vars: Optional[Dict[str, Any]] = None,
+        application_args: list[Any] | None = None,
+        env_vars: dict[str, Any] | None = None,
         verbose: bool = False,
-        spark_binary: Optional[str] = None,
+        spark_binary: str | None = None,
+        properties_file: str | None = None,
+        yarn_queue: str | None = None,
+        deploy_mode: str | None = None,
+        use_krb5ccache: bool = False,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self._application = application
-        self._conf = conf
-        self._files = files
-        self._py_files = py_files
+        self.application = application
+        self.conf = conf
+        self.files = files
+        self.py_files = py_files
         self._archives = archives
-        self._driver_class_path = driver_class_path
-        self._jars = jars
+        self.driver_class_path = driver_class_path
+        self.jars = jars
         self._java_class = java_class
-        self._packages = packages
-        self._exclude_packages = exclude_packages
+        self.packages = packages
+        self.exclude_packages = exclude_packages
         self._repositories = repositories
         self._total_executor_cores = total_executor_cores
         self._executor_cores = executor_cores
         self._executor_memory = executor_memory
         self._driver_memory = driver_memory
-        self._keytab = keytab
-        self._principal = principal
-        self._proxy_user = proxy_user
-        self._name = name
+        self.keytab = keytab
+        self.principal = principal
+        self.proxy_user = proxy_user
+        self.name = name
         self._num_executors = num_executors
         self._status_poll_interval = status_poll_interval
-        self._application_args = application_args
-        self._env_vars = env_vars
+        self.application_args = application_args
+        self.env_vars = env_vars
         self._verbose = verbose
         self._spark_binary = spark_binary
-        self._hook: Optional[SparkSubmitHook] = None
+        self.properties_file = properties_file
+        self._yarn_queue = yarn_queue
+        self._deploy_mode = deploy_mode
+        self._hook: SparkSubmitHook | None = None
         self._conn_id = conn_id
+        self._use_krb5ccache = use_krb5ccache
 
-    def execute(self, context: "Context") -> None:
-        """Call the SparkSubmitHook to run the provided spark job"""
+    def execute(self, context: Context) -> None:
+        """Call the SparkSubmitHook to run the provided spark job."""
         if self._hook is None:
             self._hook = self._get_hook()
-        self._hook.submit(self._application)
+        self._hook.submit(self.application)
 
     def on_kill(self) -> None:
         if self._hook is None:
@@ -163,29 +180,33 @@ class SparkSubmitOperator(BaseOperator):
 
     def _get_hook(self) -> SparkSubmitHook:
         return SparkSubmitHook(
-            conf=self._conf,
+            conf=self.conf,
             conn_id=self._conn_id,
-            files=self._files,
-            py_files=self._py_files,
+            files=self.files,
+            py_files=self.py_files,
             archives=self._archives,
-            driver_class_path=self._driver_class_path,
-            jars=self._jars,
+            driver_class_path=self.driver_class_path,
+            jars=self.jars,
             java_class=self._java_class,
-            packages=self._packages,
-            exclude_packages=self._exclude_packages,
+            packages=self.packages,
+            exclude_packages=self.exclude_packages,
             repositories=self._repositories,
             total_executor_cores=self._total_executor_cores,
             executor_cores=self._executor_cores,
             executor_memory=self._executor_memory,
             driver_memory=self._driver_memory,
-            keytab=self._keytab,
-            principal=self._principal,
-            proxy_user=self._proxy_user,
-            name=self._name,
+            keytab=self.keytab,
+            principal=self.principal,
+            proxy_user=self.proxy_user,
+            name=self.name,
             num_executors=self._num_executors,
             status_poll_interval=self._status_poll_interval,
-            application_args=self._application_args,
-            env_vars=self._env_vars,
+            application_args=self.application_args,
+            env_vars=self.env_vars,
             verbose=self._verbose,
             spark_binary=self._spark_binary,
+            properties_file=self.properties_file,
+            yarn_queue=self._yarn_queue,
+            deploy_mode=self._deploy_mode,
+            use_krb5ccache=self._use_krb5ccache,
         )

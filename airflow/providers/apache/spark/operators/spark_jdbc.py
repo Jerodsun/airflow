@@ -15,8 +15,9 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 from airflow.providers.apache.spark.hooks.spark_jdbc import SparkJDBCHook
 from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOperator
@@ -27,31 +28,22 @@ if TYPE_CHECKING:
 
 class SparkJDBCOperator(SparkSubmitOperator):
     """
-    This operator extends the SparkSubmitOperator specifically for performing data
-    transfers to/from JDBC-based databases with Apache Spark. As with the
-    SparkSubmitOperator, it assumes that the "spark-submit" binary is available on the
-    PATH.
+    Extend the SparkSubmitOperator to perform data transfers to/from JDBC-based databases with Apache Spark.
+
+     As with the SparkSubmitOperator, it assumes that the "spark-submit" binary is available on the PATH.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
         :ref:`howto/operator:SparkJDBCOperator`
 
     :param spark_app_name: Name of the job (default airflow-spark-jdbc)
-    :param spark_conn_id: The :ref:`spark connection id <howto/connection:spark>`
+    :param spark_conn_id: The :ref:`spark connection id <howto/connection:spark-submit>`
         as configured in Airflow administration
     :param spark_conf: Any additional Spark configuration properties
     :param spark_py_files: Additional python files used (.zip, .egg, or .py)
     :param spark_files: Additional files to upload to the container running the job
     :param spark_jars: Additional jars to upload and add to the driver and
                        executor classpath
-    :param num_executors: number of executor to run. This should be set so as to manage
-                          the number of connections made with the JDBC database
-    :param executor_cores: Number of cores per executor
-    :param executor_memory: Memory per executor (e.g. 1000M, 2G)
-    :param driver_memory: Memory allocated to the driver (e.g. 1000M, 2G)
-    :param verbose: Whether to pass the verbose flag to spark-submit for debugging
-    :param keytab: Full path to the file that contains the keytab
-    :param principal: The name of the kerberos principal used for keytab
     :param cmd_type: Which way the data should flow. 2 possible values:
                      spark_to_jdbc: data written by spark from metastore to jdbc
                      jdbc_to_spark: data written by spark from jdbc to metastore
@@ -60,7 +52,7 @@ class SparkJDBCOperator(SparkSubmitOperator):
     :param jdbc_driver: Name of the JDBC driver to use for the JDBC connection. This
                         driver (usually a jar) should be passed in the 'jars' parameter
     :param metastore_table: The name of the metastore table,
-    :param jdbc_truncate: (spark_to_jdbc only) Whether or not Spark should truncate or
+    :param jdbc_truncate: (spark_to_jdbc only) Whether Spark should truncate or
                          drop and recreate the JDBC table. This only takes effect if
                          'save_mode' is set to Overwrite. Also, if the schema is
                          different, Spark cannot truncate, and will drop and recreate
@@ -91,39 +83,33 @@ class SparkJDBCOperator(SparkSubmitOperator):
                                       (e.g: "name CHAR(64), comments VARCHAR(1024)").
                                       The specified types should be valid spark sql data
                                       types.
+    :param kwargs: kwargs passed to SparkSubmitOperator.
     """
 
     def __init__(
         self,
         *,
-        spark_app_name: str = 'airflow-spark-jdbc',
-        spark_conn_id: str = 'spark-default',
-        spark_conf: Optional[Dict[str, Any]] = None,
-        spark_py_files: Optional[str] = None,
-        spark_files: Optional[str] = None,
-        spark_jars: Optional[str] = None,
-        num_executors: Optional[int] = None,
-        executor_cores: Optional[int] = None,
-        executor_memory: Optional[str] = None,
-        driver_memory: Optional[str] = None,
-        verbose: bool = False,
-        principal: Optional[str] = None,
-        keytab: Optional[str] = None,
-        cmd_type: str = 'spark_to_jdbc',
-        jdbc_table: Optional[str] = None,
-        jdbc_conn_id: str = 'jdbc-default',
-        jdbc_driver: Optional[str] = None,
-        metastore_table: Optional[str] = None,
+        spark_app_name: str = "airflow-spark-jdbc",
+        spark_conn_id: str = "spark-default",
+        spark_conf: dict[str, Any] | None = None,
+        spark_py_files: str | None = None,
+        spark_files: str | None = None,
+        spark_jars: str | None = None,
+        cmd_type: str = "spark_to_jdbc",
+        jdbc_table: str | None = None,
+        jdbc_conn_id: str = "jdbc-default",
+        jdbc_driver: str | None = None,
+        metastore_table: str | None = None,
         jdbc_truncate: bool = False,
-        save_mode: Optional[str] = None,
-        save_format: Optional[str] = None,
-        batch_size: Optional[int] = None,
-        fetch_size: Optional[int] = None,
-        num_partitions: Optional[int] = None,
-        partition_column: Optional[str] = None,
-        lower_bound: Optional[str] = None,
-        upper_bound: Optional[str] = None,
-        create_table_column_types: Optional[str] = None,
+        save_mode: str | None = None,
+        save_format: str | None = None,
+        batch_size: int | None = None,
+        fetch_size: int | None = None,
+        num_partitions: int | None = None,
+        partition_column: str | None = None,
+        lower_bound: str | None = None,
+        upper_bound: str | None = None,
+        create_table_column_types: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -133,13 +119,6 @@ class SparkJDBCOperator(SparkSubmitOperator):
         self._spark_py_files = spark_py_files
         self._spark_files = spark_files
         self._spark_jars = spark_jars
-        self._num_executors = num_executors
-        self._executor_cores = executor_cores
-        self._executor_memory = executor_memory
-        self._driver_memory = driver_memory
-        self._verbose = verbose
-        self._keytab = keytab
-        self._principal = principal
         self._cmd_type = cmd_type
         self._jdbc_table = jdbc_table
         self._jdbc_conn_id = jdbc_conn_id
@@ -155,10 +134,10 @@ class SparkJDBCOperator(SparkSubmitOperator):
         self._lower_bound = lower_bound
         self._upper_bound = upper_bound
         self._create_table_column_types = create_table_column_types
-        self._hook: Optional[SparkJDBCHook] = None
+        self._hook: SparkJDBCHook | None = None
 
-    def execute(self, context: "Context") -> None:
-        """Call the SparkSubmitHook to run the provided spark job"""
+    def execute(self, context: Context) -> None:
+        """Call the SparkSubmitHook to run the provided spark job."""
         if self._hook is None:
             self._hook = self._get_hook()
         self._hook.submit_jdbc_job()
@@ -181,8 +160,8 @@ class SparkJDBCOperator(SparkSubmitOperator):
             executor_memory=self._executor_memory,
             driver_memory=self._driver_memory,
             verbose=self._verbose,
-            keytab=self._keytab,
-            principal=self._principal,
+            keytab=self.keytab,
+            principal=self.principal,
             cmd_type=self._cmd_type,
             jdbc_table=self._jdbc_table,
             jdbc_conn_id=self._jdbc_conn_id,
@@ -198,4 +177,5 @@ class SparkJDBCOperator(SparkSubmitOperator):
             lower_bound=self._lower_bound,
             upper_bound=self._upper_bound,
             create_table_column_types=self._create_table_column_types,
+            use_krb5ccache=self._use_krb5ccache,
         )

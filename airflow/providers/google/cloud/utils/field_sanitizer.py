@@ -67,7 +67,7 @@ specification of the path you should delete - separated with '.'
 >>>         },
 >>>     }
 >>> }
->>> sanitizer=GcpBodyFieldSanitizer(FIELDS_TO_SANITIZE)
+>>> sanitizer = GcpBodyFieldSanitizer(FIELDS_TO_SANITIZE)
 >>> sanitizer.sanitize(body)
 >>> json.dumps(body, indent=2)
 {
@@ -97,16 +97,14 @@ arrays - the sanitizer iterates through all dictionaries in the array and search
 components in all elements of the array.
 """
 
-from typing import List
+from __future__ import annotations
 
 from airflow.exceptions import AirflowException
 from airflow.utils.log.logging_mixin import LoggingMixin
 
 
 class GcpFieldSanitizerException(AirflowException):
-    """Thrown when sanitizer finds unexpected field type in the path
-    (other than dict or array).
-    """
+    """Thrown when sanitizer finds unexpected field type in the path (other than dict or array)."""
 
 
 class GcpBodyFieldSanitizer(LoggingMixin):
@@ -116,7 +114,7 @@ class GcpBodyFieldSanitizer(LoggingMixin):
 
     """
 
-    def __init__(self, sanitize_specs: List[str]) -> None:
+    def __init__(self, sanitize_specs: list[str]) -> None:
         super().__init__()
         self._sanitize_specs = sanitize_specs
 

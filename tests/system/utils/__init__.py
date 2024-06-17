@@ -14,15 +14,56 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-import os
+from __future__ import annotations
 
-from airflow.utils.state import State
+import logging
+import os
+from typing import TYPE_CHECKING, Callable
+
+from tabulate import tabulate
+
+from airflow.utils.state import DagRunState
+
+if TYPE_CHECKING:
+    from airflow.utils.context import Context
+
+logger = logging.getLogger(__name__)
 
 
 def get_test_run(dag):
+    def callback(context: Context):
+        ti = context["dag_run"].get_task_instances()
+        if not ti:
+            logger.warning("could not retrieve tasks that ran in the DAG, cannot display a summary")
+            return
+
+        ti.sort(key=lambda x: x.end_date)
+
+        headers = ["Task ID", "Status"]
+        results = []
+        for t in ti:
+            results.append([t.task_id, t.state])
+
+        logger.info("EXECUTION SUMMARY:\n%s", tabulate(results, headers=headers, tablefmt="fancy_grid"))
+
+    def add_callback(current: list[Callable] | Callable | None, new: Callable) -> list[Callable] | Callable:
+        if not current:
+            return new
+        elif isinstance(current, list):
+            current.append(new)
+            return current
+        else:
+            return [current, new]
+
     def test_run():
-        dag.clear(dag_run_state=State.QUEUED)
-        dag.run()
+        dag.on_failure_callback = add_callback(dag.on_failure_callback, callback)
+        dag.on_success_callback = add_callback(dag.on_success_callback, callback)
+        # If the env variable ``_AIRFLOW__SYSTEM_TEST_USE_EXECUTOR`` is set, then use an executor to run the
+        # DAG
+        dag_run = dag.test(use_executor=os.environ.get("_AIRFLOW__SYSTEM_TEST_USE_EXECUTOR") == "1")
+        assert (
+            dag_run.state == DagRunState.SUCCESS
+        ), "The system test failed, please look at the logs to find out the underlying failed task(s)"
 
     return test_run
 

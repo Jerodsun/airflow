@@ -16,8 +16,10 @@
 # specific language governing permissions and limitations
 # under the License.
 """This module allows you to transfer mail attachments from a mail server into s3 bucket."""
-import warnings
-from typing import TYPE_CHECKING, Optional, Sequence
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Sequence
 
 from airflow.models import BaseOperator
 from airflow.providers.amazon.aws.hooks.s3 import S3Hook
@@ -25,10 +27,6 @@ from airflow.providers.imap.hooks.imap import ImapHook
 
 if TYPE_CHECKING:
     from airflow.utils.context import Context
-
-_DEPRECATION_MSG = (
-    "The s3_conn_id parameter has been deprecated. You should pass instead the aws_conn_id parameter."
-)
 
 
 class ImapAttachmentToS3Operator(BaseOperator):
@@ -48,10 +46,14 @@ class ImapAttachmentToS3Operator(BaseOperator):
         See :py:meth:`imaplib.IMAP4.search` for details.
     :param s3_overwrite: If set overwrites the s3 key if already exists.
     :param imap_conn_id: The reference to the connection details of the mail server.
-    :param aws_conn_id: AWS connection to use.
+    :param aws_conn_id: The Airflow connection used for AWS credentials.
+        If this is None or empty then the default boto3 behaviour is used. If
+        running Airflow in a distributed manner and aws_conn_id is None or
+        empty, then default boto3 configuration would be used (and must be
+        maintained on each worker node).
     """
 
-    template_fields: Sequence[str] = ('imap_attachment_name', 's3_key', 'imap_mail_filter')
+    template_fields: Sequence[str] = ("imap_attachment_name", "s3_key", "imap_mail_filter")
 
     def __init__(
         self,
@@ -60,19 +62,14 @@ class ImapAttachmentToS3Operator(BaseOperator):
         s3_bucket: str,
         s3_key: str,
         imap_check_regex: bool = False,
-        imap_mail_folder: str = 'INBOX',
-        imap_mail_filter: str = 'All',
+        imap_mail_folder: str = "INBOX",
+        imap_mail_filter: str = "All",
         s3_overwrite: bool = False,
-        imap_conn_id: str = 'imap_default',
-        s3_conn_id: Optional[str] = None,
-        aws_conn_id: str = 'aws_default',
+        imap_conn_id: str = "imap_default",
+        aws_conn_id: str | None = "aws_default",
         **kwargs,
     ) -> None:
         super().__init__(**kwargs)
-        if s3_conn_id:
-            warnings.warn(_DEPRECATION_MSG, DeprecationWarning, stacklevel=3)
-            aws_conn_id = s3_conn_id
-
         self.imap_attachment_name = imap_attachment_name
         self.s3_bucket = s3_bucket
         self.s3_key = s3_key
@@ -83,14 +80,14 @@ class ImapAttachmentToS3Operator(BaseOperator):
         self.imap_conn_id = imap_conn_id
         self.aws_conn_id = aws_conn_id
 
-    def execute(self, context: 'Context') -> None:
+    def execute(self, context: Context) -> None:
         """
-        This function executes the transfer from the email server (via imap) into s3.
+        Execute the transfer from the email server (via imap) into s3.
 
         :param context: The context while executing.
         """
         self.log.info(
-            'Transferring mail attachment %s from mail server via imap to s3 key %s...',
+            "Transferring mail attachment %s from mail server via imap to s3 key %s...",
             self.imap_attachment_name,
             self.s3_key,
         )

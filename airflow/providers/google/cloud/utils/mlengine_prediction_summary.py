@@ -102,10 +102,12 @@ To test outside of the dag:
         ]
     )
 
-.. spelling::
+.. spelling:word-list::
 
     pcoll
 """
+
+from __future__ import annotations
 
 import argparse
 import base64
@@ -115,9 +117,10 @@ import os
 
 import apache_beam as beam
 import dill
+from apache_beam.coders.coders import Coder
 
 
-class JsonCoder:
+class JsonCoder(Coder):
     """JSON encoder/decoder."""
 
     @staticmethod
@@ -137,7 +140,7 @@ def MakeSummary(pcoll, metric_fn, metric_keys):
     return (
         pcoll
         | "ApplyMetricFnPerInstance" >> beam.Map(metric_fn)
-        | "PairWith1" >> beam.Map(lambda tup: tup + (1,))
+        | "PairWith1" >> beam.Map(lambda tup: (*tup, 1))
         | "SumTuple" >> beam.CombineGlobally(beam.combiners.TupleCombineFn(*([sum] * (len(metric_keys) + 1))))
         | "AverageAndMakeDict"
         >> beam.Map(
@@ -149,7 +152,7 @@ def MakeSummary(pcoll, metric_fn, metric_keys):
 
 
 def run(argv=None):
-    """Helper for obtaining prediction summary."""
+    """Obtain prediction summary."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--prediction_path",
@@ -189,7 +192,6 @@ def run(argv=None):
     metric_keys = known_args.metric_keys.split(",")
 
     with beam.Pipeline(options=beam.pipeline.PipelineOptions(pipeline_args)) as pipe:
-
         prediction_result_pattern = os.path.join(known_args.prediction_path, "prediction.results-*-of-*")
         prediction_summary_path = os.path.join(known_args.prediction_path, "prediction.summary.json")
         # This is apache-beam ptransform's convention
@@ -200,7 +202,7 @@ def run(argv=None):
             | "Write"
             >> beam.io.WriteToText(
                 prediction_summary_path,
-                shard_name_template='',  # without trailing -NNNNN-of-NNNNN.
+                shard_name_template="",  # without trailing -NNNNN-of-NNNNN.
                 coder=JsonCoder(),
             )
         )

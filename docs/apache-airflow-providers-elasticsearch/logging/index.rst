@@ -61,7 +61,6 @@ cert, etc.) use the ``elasticsearch_configs`` setting in your ``airflow.cfg``
     remote_logging = True
 
     [elasticsearch_configs]
-    use_ssl=True
     verify_certs=True
     ca_certs=/path/to/CA_certs
 
@@ -95,4 +94,4 @@ containing your previous ``log_id_template``. For example, if you used the defau
 
 .. code-block:: sql
 
-    INSERT INTO log_template (id, filename, elasticsearch_id, created_at) VALUES (0, '{{ ti.dag_id }}/{{ ti.task_id }}/{{ ts }}/{{ try_number }}.log', '{dag_id}_{task_id}_{run_id}_{try_number}', NOW());
+    INSERT INTO log_template (id, filename, elasticsearch_id, created_at) VALUES (0, '{{ ti.dag_id }}/{{ ti.task_id }}/{{ ts }}/{{ try_number }}.log', '{dag_id}-{task_id}-{execution_date}-{try_number}', NOW());

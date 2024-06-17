@@ -15,10 +15,12 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
+from __future__ import annotations
+
+from airflow.exceptions import AirflowException
+
 # Note: Any AirflowException raised is expected to cause the TaskInstance
 #       to be marked in an ERROR state
-import warnings
 
 
 class EcsTaskFailToStart(Exception):
@@ -29,6 +31,7 @@ class EcsTaskFailToStart(Exception):
         super().__init__(message)
 
     def __reduce__(self):
+        """Return ECSTask state and its message."""
         return EcsTaskFailToStart, (self.message)
 
 
@@ -41,20 +44,9 @@ class EcsOperatorError(Exception):
         super().__init__(message)
 
     def __reduce__(self):
+        """Return EcsOperator state and a tuple of failures list and message."""
         return EcsOperatorError, (self.failures, self.message)
 
 
-class ECSOperatorError(EcsOperatorError):
-    """
-    This class is deprecated.
-    Please use :class:`airflow.providers.amazon.aws.exceptions.EcsOperatorError`.
-    """
-
-    def __init__(self, *args, **kwargs):
-        warnings.warn(
-            "This class is deprecated. "
-            "Please use `airflow.providers.amazon.aws.exceptions.EcsOperatorError`.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        super().__init__(*args, **kwargs)
+class S3HookUriParseFailure(AirflowException):
+    """When parse_s3_url fails to parse URL, this error is thrown."""

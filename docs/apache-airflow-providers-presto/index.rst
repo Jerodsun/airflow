@@ -19,32 +19,44 @@
 ``apache-airflow-providers-presto``
 ===================================
 
-Content
--------
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: Basics
+
+    Home <self>
+    Changelog <changelog>
+    Security <security>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Guides
 
     PrestoTransferOperator types <operators/transfer/gcs_to_presto>
+    Connection types <connections>
 
 .. toctree::
-    :maxdepth: 1
-    :caption: Guides
-
-    PrestoToSlackOperator types <operators/transfer/presto_to_slack>
-
-.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: References
 
     Python API <_api/airflow/providers/presto/index>
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: System tests
+
+    System Tests <_api/tests/system/providers/presto/index>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Resources
 
-    Example DAGs <https://github.com/apache/airflow/tree/main/tests/system/providers/presto>
+    Example DAGs <https://github.com/apache/airflow/tree/providers-presto/|version|/tests/system/providers/presto>
     PyPI Repository <https://pypi.org/project/apache-airflow-providers-presto/>
     Installing from sources <installing-providers-from-sources>
 
@@ -52,43 +64,47 @@ Content
 
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
     Detailed list of commits <commits>
 
 
-Package apache-airflow-providers-presto
+apache-airflow-providers-presto package
 ------------------------------------------------------
 
-`Presto <https://prestodb.github.io/>`__
+`Presto <https://prestodb.io/>`__
 
 
-Release: 3.0.0
+Release: 5.5.1
 
 Provider package
 ----------------
 
-This is a provider package for ``presto`` provider. All classes for this provider package
-are in ``airflow.providers.presto`` python package.
+This package is for the ``presto`` provider.
+All classes for this package are included in the ``airflow.providers.presto`` python package.
 
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
-for the minimum Airflow version supported) via
-``pip install apache-airflow-providers-presto``
+You can install this package on top of an existing Airflow 2 installation via
+``pip install apache-airflow-providers-presto``.
+For the minimum Airflow version supported, see ``Requirements`` below.
 
 Requirements
 ------------
 
-========================  ==================
-PIP package               Version required
-========================  ==================
-``apache-airflow``        ``>=2.2.0``
-``pandas``                ``>=0.17.1``
-``presto-python-client``  ``>=0.7.0,<0.8``
-========================  ==================
+The minimum Apache Airflow version supported by this provider package is ``2.7.0``.
+
+=======================================  ==================
+PIP package                              Version required
+=======================================  ==================
+``apache-airflow``                       ``>=2.7.0``
+``apache-airflow-providers-common-sql``  ``>=1.3.1``
+``presto-python-client``                 ``>=0.8.4``
+``pandas``                               ``>=1.2.5,<2.2``
+=======================================  ==================
 
 Cross provider package dependencies
 -----------------------------------
@@ -100,15 +116,15 @@ You can install such cross-provider dependencies when installing from PyPI. For 
 
 .. code-block:: bash
 
-    pip install apache-airflow-providers-presto[google]
+    pip install apache-airflow-providers-presto[common.sql]
 
 
-====================================================================================================  ==========
-Dependent package                                                                                     Extra
-====================================================================================================  ==========
-`apache-airflow-providers-google <https://airflow.apache.org/docs/apache-airflow-providers-google>`_  ``google``
-`apache-airflow-providers-slack <https://airflow.apache.org/docs/apache-airflow-providers-slack>`_    ``slack``
-====================================================================================================  ==========
+============================================================================================================  ==============
+Dependent package                                                                                             Extra
+============================================================================================================  ==============
+`apache-airflow-providers-common-sql <https://airflow.apache.org/docs/apache-airflow-providers-common-sql>`_  ``common.sql``
+`apache-airflow-providers-google <https://airflow.apache.org/docs/apache-airflow-providers-google>`_          ``google``
+============================================================================================================  ==============
 
 Downloading official packages
 -----------------------------
@@ -116,7 +132,5 @@ Downloading official packages
 You can download officially released packages and verify their checksums and signatures from the
 `Official Apache Download site <https://downloads.apache.org/airflow/providers/>`_
 
-* `The apache-airflow-providers-presto 3.0.0 sdist package <https://downloads.apache.org/airflow/providers/apache-airflow-providers-presto-3.0.0.tar.gz>`_ (`asc <https://downloads.apache.org/airflow/providers/apache-airflow-providers-presto-3.0.0.tar.gz.asc>`__, `sha512 <https://downloads.apache.org/airflow/providers/apache-airflow-providers-presto-3.0.0.tar.gz.sha512>`__)
-* `The apache-airflow-providers-presto 3.0.0 wheel package <https://downloads.apache.org/airflow/providers/apache_airflow_providers_presto-3.0.0-py3-none-any.whl>`_ (`asc <https://downloads.apache.org/airflow/providers/apache_airflow_providers_presto-3.0.0-py3-none-any.whl.asc>`__, `sha512 <https://downloads.apache.org/airflow/providers/apache_airflow_providers_presto-3.0.0-py3-none-any.whl.sha512>`__)
-
-.. include:: ../../airflow/providers/presto/CHANGELOG.rst
+* `The apache-airflow-providers-presto 5.5.1 sdist package <https://downloads.apache.org/airflow/providers/apache_airflow_providers_presto-5.5.1.tar.gz>`_ (`asc <https://downloads.apache.org/airflow/providers/apache_airflow_providers_presto-5.5.1.tar.gz.asc>`__, `sha512 <https://downloads.apache.org/airflow/providers/apache_airflow_providers_presto-5.5.1.tar.gz.sha512>`__)
+* `The apache-airflow-providers-presto 5.5.1 wheel package <https://downloads.apache.org/airflow/providers/apache_airflow_providers_presto-5.5.1-py3-none-any.whl>`_ (`asc <https://downloads.apache.org/airflow/providers/apache_airflow_providers_presto-5.5.1-py3-none-any.whl.asc>`__, `sha512 <https://downloads.apache.org/airflow/providers/apache_airflow_providers_presto-5.5.1-py3-none-any.whl.sha512>`__)

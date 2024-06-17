@@ -15,10 +15,11 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
-import unittest
+from __future__ import annotations
+
 from unittest import mock
 
+import pytest
 from google.api_core.gapic_v1.method import DEFAULT
 from google.cloud.automl_v1beta1 import AutoMlClient
 
@@ -50,14 +51,18 @@ DATASET = {"dataset_id": "data"}
 MASK = {"field": "mask"}
 
 
-class TestAuoMLHook(unittest.TestCase):
-    def setUp(self) -> None:
+class TestAutoMLHook:
+    def test_delegate_to_runtime_error(self):
+        with pytest.raises(RuntimeError):
+            CloudAutoMLHook(gcp_conn_id="GCP_CONN_ID", delegate_to="delegate_to")
+
+    def setup_method(self):
         with mock.patch(
             "airflow.providers.google.cloud.hooks.automl.GoogleBaseHook.__init__",
             new=mock_base_gcp_hook_no_default_project_id,
         ):
             self.hook = CloudAutoMLHook()
-            self.hook._get_credentials = mock.MagicMock(return_value=CREDENTIALS)  # type: ignore
+            self.hook.get_credentials = mock.MagicMock(return_value=CREDENTIALS)  # type: ignore
 
     @mock.patch("airflow.providers.google.cloud.hooks.automl.AutoMlClient")
     def test_get_conn(self, mock_automl_client):
@@ -66,7 +71,7 @@ class TestAuoMLHook(unittest.TestCase):
 
     @mock.patch("airflow.providers.google.cloud.hooks.automl.PredictionServiceClient")
     def test_prediction_client(self, mock_prediction_client):
-        client = self.hook.prediction_client  # noqa
+        client = self.hook.prediction_client  # noqa: F841
         mock_prediction_client.assert_called_once_with(credentials=CREDENTIALS, client_info=CLIENT_INFO)
 
     @mock.patch("airflow.providers.google.cloud.hooks.automl.AutoMlClient.create_model")
@@ -244,5 +249,13 @@ class TestAuoMLHook(unittest.TestCase):
         self.hook.delete_dataset(dataset_id=DATASET_ID, location=GCP_LOCATION, project_id=GCP_PROJECT_ID)
 
         mock_delete_dataset.assert_called_once_with(
+            request=dict(name=DATASET_PATH), retry=DEFAULT, timeout=None, metadata=()
+        )
+
+    @mock.patch("airflow.providers.google.cloud.hooks.automl.AutoMlClient.get_dataset")
+    def test_get_dataset(self, mock_get_dataset):
+        self.hook.get_dataset(dataset_id=DATASET_ID, location=GCP_LOCATION, project_id=GCP_PROJECT_ID)
+
+        mock_get_dataset.assert_called_once_with(
             request=dict(name=DATASET_PATH), retry=DEFAULT, timeout=None, metadata=()
         )

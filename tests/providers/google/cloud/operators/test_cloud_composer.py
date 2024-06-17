@@ -14,6 +14,8 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
+
 from unittest import mock
 
 import pytest
@@ -26,16 +28,19 @@ from airflow.providers.google.cloud.operators.cloud_composer import (
     CloudComposerGetEnvironmentOperator,
     CloudComposerListEnvironmentsOperator,
     CloudComposerListImageVersionsOperator,
+    CloudComposerRunAirflowCLICommandOperator,
     CloudComposerUpdateEnvironmentOperator,
 )
-from airflow.providers.google.cloud.triggers.cloud_composer import CloudComposerExecutionTrigger
+from airflow.providers.google.cloud.triggers.cloud_composer import (
+    CloudComposerAirflowCLICommandTrigger,
+    CloudComposerExecutionTrigger,
+)
 from airflow.providers.google.common.consts import GOOGLE_DEFAULT_DEFERRABLE_METHOD_NAME
 
 TASK_ID = "task-id"
 TEST_GCP_REGION = "global"
 TEST_GCP_PROJECT = "test-project"
 TEST_GCP_CONN_ID = "test-gcp-conn-id"
-TEST_DELEGATE_TO = None
 TEST_IMPERSONATION_CHAIN = None
 TEST_ENVIRONMENT_ID = "testenvname"
 TEST_ENVIRONMENT = {
@@ -45,6 +50,10 @@ TEST_ENVIRONMENT = {
         "software_config": {"image_version": "composer-1.17.7-airflow-2.1.4"},
     },
 }
+TEST_USER_COMMAND = "dags list -o json --verbose"
+TEST_COMMAND = "dags"
+TEST_SUBCOMMAND = "list"
+TEST_PARAMETERS = ["-o", "json", "--verbose"]
 
 TEST_UPDATE_MASK = {"paths": ["labels.label1"]}
 TEST_UPDATED_ENVIRONMENT = {
@@ -81,7 +90,6 @@ class TestCloudComposerCreateEnvironmentOperator:
         mock_hook.assert_called_once_with(
             gcp_conn_id=TEST_GCP_CONN_ID,
             impersonation_chain=TEST_IMPERSONATION_CHAIN,
-            delegate_to=TEST_DELEGATE_TO,
         )
         mock_hook.return_value.create_environment.assert_called_once_with(
             project_id=TEST_GCP_PROJECT,
@@ -94,7 +102,7 @@ class TestCloudComposerCreateEnvironmentOperator:
 
     @mock.patch(COMPOSER_STRING.format("Environment.to_dict"))
     @mock.patch(COMPOSER_STRING.format("CloudComposerHook"))
-    @mock.patch(COMPOSER_TRIGGERS_STRING.format("CloudComposerHook"))
+    @mock.patch(COMPOSER_TRIGGERS_STRING.format("CloudComposerAsyncHook"))
     def test_execute_deferrable(self, mock_trigger_hook, mock_hook, to_dict_mode):
         op = CloudComposerCreateEnvironmentOperator(
             task_id=TASK_ID,
@@ -133,7 +141,6 @@ class TestCloudComposerDeleteEnvironmentOperator:
         mock_hook.assert_called_once_with(
             gcp_conn_id=TEST_GCP_CONN_ID,
             impersonation_chain=TEST_IMPERSONATION_CHAIN,
-            delegate_to=TEST_DELEGATE_TO,
         )
         mock_hook.return_value.delete_environment.assert_called_once_with(
             project_id=TEST_GCP_PROJECT,
@@ -145,7 +152,7 @@ class TestCloudComposerDeleteEnvironmentOperator:
         )
 
     @mock.patch(COMPOSER_STRING.format("CloudComposerHook"))
-    @mock.patch(COMPOSER_TRIGGERS_STRING.format("CloudComposerHook"))
+    @mock.patch(COMPOSER_TRIGGERS_STRING.format("CloudComposerAsyncHook"))
     def test_execute_deferrable(self, mock_trigger_hook, mock_hook):
         op = CloudComposerDeleteEnvironmentOperator(
             task_id=TASK_ID,
@@ -185,7 +192,6 @@ class TestCloudComposerUpdateEnvironmentOperator:
         mock_hook.assert_called_once_with(
             gcp_conn_id=TEST_GCP_CONN_ID,
             impersonation_chain=TEST_IMPERSONATION_CHAIN,
-            delegate_to=TEST_DELEGATE_TO,
         )
         mock_hook.return_value.update_environment.assert_called_once_with(
             project_id=TEST_GCP_PROJECT,
@@ -200,7 +206,7 @@ class TestCloudComposerUpdateEnvironmentOperator:
 
     @mock.patch(COMPOSER_STRING.format("Environment.to_dict"))
     @mock.patch(COMPOSER_STRING.format("CloudComposerHook"))
-    @mock.patch(COMPOSER_TRIGGERS_STRING.format("CloudComposerHook"))
+    @mock.patch(COMPOSER_TRIGGERS_STRING.format("CloudComposerAsyncHook"))
     def test_execute_deferrable(self, mock_trigger_hook, mock_hook, to_dict_mode):
         op = CloudComposerUpdateEnvironmentOperator(
             task_id=TASK_ID,
@@ -241,7 +247,6 @@ class TestCloudComposerGetEnvironmentOperator:
         mock_hook.assert_called_once_with(
             gcp_conn_id=TEST_GCP_CONN_ID,
             impersonation_chain=TEST_IMPERSONATION_CHAIN,
-            delegate_to=TEST_DELEGATE_TO,
         )
         mock_hook.return_value.get_environment.assert_called_once_with(
             project_id=TEST_GCP_PROJECT,
@@ -269,7 +274,6 @@ class TestCloudComposerListEnvironmentsOperator:
         mock_hook.assert_called_once_with(
             gcp_conn_id=TEST_GCP_CONN_ID,
             impersonation_chain=TEST_IMPERSONATION_CHAIN,
-            delegate_to=TEST_DELEGATE_TO,
         )
         mock_hook.return_value.list_environments.assert_called_once_with(
             project_id=TEST_GCP_PROJECT,
@@ -298,7 +302,6 @@ class TestCloudComposerListImageVersionsOperator:
         mock_hook.assert_called_once_with(
             gcp_conn_id=TEST_GCP_CONN_ID,
             impersonation_chain=TEST_IMPERSONATION_CHAIN,
-            delegate_to=TEST_DELEGATE_TO,
         )
         mock_hook.return_value.list_image_versions.assert_called_once_with(
             project_id=TEST_GCP_PROJECT,
@@ -310,3 +313,59 @@ class TestCloudComposerListImageVersionsOperator:
             timeout=TEST_TIMEOUT,
             metadata=TEST_METADATA,
         )
+
+
+class TestCloudComposerRunAirflowCLICommandOperator:
+    @mock.patch(COMPOSER_STRING.format("ExecuteAirflowCommandResponse.to_dict"))
+    @mock.patch(COMPOSER_STRING.format("CloudComposerHook"))
+    def test_execute(self, mock_hook, to_dict_mode) -> None:
+        op = CloudComposerRunAirflowCLICommandOperator(
+            task_id=TASK_ID,
+            project_id=TEST_GCP_PROJECT,
+            region=TEST_GCP_REGION,
+            environment_id=TEST_ENVIRONMENT_ID,
+            command=TEST_USER_COMMAND,
+            gcp_conn_id=TEST_GCP_CONN_ID,
+            retry=TEST_RETRY,
+            timeout=TEST_TIMEOUT,
+            metadata=TEST_METADATA,
+        )
+        op.execute(mock.MagicMock())
+        mock_hook.assert_called_once_with(
+            gcp_conn_id=TEST_GCP_CONN_ID,
+            impersonation_chain=TEST_IMPERSONATION_CHAIN,
+        )
+        mock_hook.return_value.execute_airflow_command.assert_called_once_with(
+            project_id=TEST_GCP_PROJECT,
+            region=TEST_GCP_REGION,
+            environment_id=TEST_ENVIRONMENT_ID,
+            command=TEST_COMMAND,
+            subcommand=TEST_SUBCOMMAND,
+            parameters=TEST_PARAMETERS,
+            retry=TEST_RETRY,
+            timeout=TEST_TIMEOUT,
+            metadata=TEST_METADATA,
+        )
+
+    @mock.patch(COMPOSER_STRING.format("ExecuteAirflowCommandResponse.to_dict"))
+    @mock.patch(COMPOSER_STRING.format("CloudComposerHook"))
+    @mock.patch(COMPOSER_TRIGGERS_STRING.format("CloudComposerAsyncHook"))
+    def test_execute_deferrable(self, mock_trigger_hook, mock_hook, to_dict_mode):
+        op = CloudComposerRunAirflowCLICommandOperator(
+            task_id=TASK_ID,
+            project_id=TEST_GCP_PROJECT,
+            region=TEST_GCP_REGION,
+            environment_id=TEST_ENVIRONMENT_ID,
+            command=TEST_USER_COMMAND,
+            gcp_conn_id=TEST_GCP_CONN_ID,
+            retry=TEST_RETRY,
+            timeout=TEST_TIMEOUT,
+            metadata=TEST_METADATA,
+            deferrable=True,
+        )
+
+        with pytest.raises(TaskDeferred) as exc:
+            op.execute(mock.MagicMock())
+
+        assert isinstance(exc.value.trigger, CloudComposerAirflowCLICommandTrigger)
+        assert exc.value.method_name == GOOGLE_DEFAULT_DEFERRABLE_METHOD_NAME

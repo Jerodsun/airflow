@@ -16,15 +16,18 @@
 # specific language governing permissions and limitations
 # under the License.
 """This module contains Google BigQuery links."""
+
+from __future__ import annotations
+
 from typing import TYPE_CHECKING
 
-from airflow.models import BaseOperator
 from airflow.providers.google.cloud.links.base import BaseGoogleLink
 
 if TYPE_CHECKING:
+    from airflow.models import BaseOperator
     from airflow.utils.context import Context
 
-BIGQUERY_BASE_LINK = "https://console.cloud.google.com/bigquery"
+BIGQUERY_BASE_LINK = "/bigquery"
 BIGQUERY_DATASET_LINK = (
     BIGQUERY_BASE_LINK + "?referrer=search&project={project_id}&d={dataset_id}&p={project_id}&page=dataset"
 )
@@ -35,7 +38,7 @@ BIGQUERY_TABLE_LINK = (
 
 
 class BigQueryDatasetLink(BaseGoogleLink):
-    """Helper class for constructing BigQuery Dataset Link"""
+    """Helper class for constructing BigQuery Dataset Link."""
 
     name = "BigQuery Dataset"
     key = "bigquery_dataset"
@@ -43,7 +46,7 @@ class BigQueryDatasetLink(BaseGoogleLink):
 
     @staticmethod
     def persist(
-        context: "Context",
+        context: Context,
         task_instance: BaseOperator,
         dataset_id: str,
         project_id: str,
@@ -56,7 +59,7 @@ class BigQueryDatasetLink(BaseGoogleLink):
 
 
 class BigQueryTableLink(BaseGoogleLink):
-    """Helper class for constructing BigQuery Table Link"""
+    """Helper class for constructing BigQuery Table Link."""
 
     name = "BigQuery Table"
     key = "bigquery_table"
@@ -64,11 +67,11 @@ class BigQueryTableLink(BaseGoogleLink):
 
     @staticmethod
     def persist(
-        context: "Context",
+        context: Context,
         task_instance: BaseOperator,
-        dataset_id: str,
         project_id: str,
         table_id: str,
+        dataset_id: str | None = None,
     ):
         task_instance.xcom_push(
             context,

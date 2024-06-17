@@ -14,22 +14,23 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
 import base64
 import json
-import unittest
 from datetime import datetime
 from unittest import mock
 
 import dill
 import pytest
 
-from airflow.exceptions import AirflowException
+from airflow.exceptions import AirflowException, AirflowProviderDeprecationWarning
 from airflow.models import DAG
 from airflow.operators.python import PythonOperator
 from airflow.providers.apache.beam.operators.beam import BeamRunPythonPipelineOperator
 from airflow.providers.google.cloud.hooks.gcs import GCSHook
 from airflow.providers.google.cloud.utils.mlengine_operator_utils import create_evaluate_ops
+from tests.providers.google.cloud.operators.test_mlengine import DEPRECATION_MESSAGE
 
 TASK_PREFIX = "test-task-prefix"
 TASK_PREFIX_PREDICTION = TASK_PREFIX + "-prediction"
@@ -67,61 +68,66 @@ def get_metric_fn_and_keys():
     import math
 
     def error_and_squared_error(inst):
-        label = float(inst['input_label'])
-        classes = float(inst['classes'])
+        label = float(inst["input_label"])
+        classes = float(inst["classes"])
         err = abs(classes - label)
         squared_err = math.pow(classes - label, 2)
         return err, squared_err
 
-    return error_and_squared_error, ['err', 'mse']
+    return error_and_squared_error, ["err", "mse"]
 
 
 METRIC_FN, METRIC_KEYS = get_metric_fn_and_keys()
-METRIC_FN_ENCODED = base64.b64encode(dill.dumps(METRIC_FN, recurse=True)).decode()
-METRIC_KEYS_EXPECTED = ','.join(METRIC_KEYS)
+METRIC_KEYS_EXPECTED = ",".join(METRIC_KEYS)
 
 
 def validate_err_and_count(summary):
-    if summary['err'] > 0.2:
-        raise ValueError(f'Too high err>0.2; summary={summary}')
-    if summary['mse'] > 0.05:
-        raise ValueError(f'Too high mse>0.05; summary={summary}')
-    if summary['count'] < 1000:
-        raise ValueError(f'Too few instances<1000; summary={summary}')
+    if summary["err"] > 0.2:
+        raise ValueError(f"Too high err>0.2; summary={summary}")
+    if summary["mse"] > 0.05:
+        raise ValueError(f"Too high mse>0.05; summary={summary}")
+    if summary["count"] < 1000:
+        raise ValueError(f"Too few instances<1000; summary={summary}")
     return summary
 
 
-class TestMlengineOperatorUtils(unittest.TestCase):
+class TestMlengineOperatorUtils:
     @mock.patch.object(PythonOperator, "set_upstream")
     @mock.patch.object(BeamRunPythonPipelineOperator, "set_upstream")
     def test_create_evaluate_ops(self, mock_beam_pipeline, mock_python):
-        result = create_evaluate_ops(
-            task_prefix=TASK_PREFIX,
-            data_format=DATA_FORMAT,
-            input_paths=INPUT_PATHS,
-            prediction_path=PREDICTION_PATH,
-            metric_fn_and_keys=get_metric_fn_and_keys(),
-            validate_fn=validate_err_and_count,
-            batch_prediction_job_id=BATCH_PREDICTION_JOB_ID,
-            project_id=PROJECT_ID,
-            region=REGION,
-            dataflow_options=DATAFLOW_OPTIONS,
-            model_uri=MODEL_URI,
-        )
+        with pytest.warns(AirflowProviderDeprecationWarning, match=DEPRECATION_MESSAGE):
+            result = create_evaluate_ops(
+                task_prefix=TASK_PREFIX,
+                data_format=DATA_FORMAT,
+                input_paths=INPUT_PATHS,
+                prediction_path=PREDICTION_PATH,
+                metric_fn_and_keys=get_metric_fn_and_keys(),
+                validate_fn=validate_err_and_count,
+                batch_prediction_job_id=BATCH_PREDICTION_JOB_ID,
+                project_id=PROJECT_ID,
+                region=REGION,
+                dataflow_options=DATAFLOW_OPTIONS,
+                model_uri=MODEL_URI,
+            )
 
         evaluate_prediction, evaluate_summary, evaluate_validation = result
 
         mock_beam_pipeline.assert_called_once_with(evaluate_prediction)
         mock_python.assert_called_once_with(evaluate_summary)
 
+        # importing apache_beam elsewhere modifies the metrics. In order to avoid metrics being modified
+        # by apache_beam import happening after importing this test, we retrieve the metrics here rather than
+        # at the top of the file.
+        METRIC_FN_ENCODED = base64.b64encode(dill.dumps(METRIC_FN, recurse=True)).decode()
+
         assert TASK_PREFIX_PREDICTION == evaluate_prediction.task_id
-        assert PROJECT_ID == evaluate_prediction._project_id
-        assert BATCH_PREDICTION_JOB_ID == evaluate_prediction._job_id
-        assert REGION == evaluate_prediction._region
+        assert PROJECT_ID == evaluate_prediction.project_id
+        assert BATCH_PREDICTION_JOB_ID == evaluate_prediction.job_id
+        assert REGION == evaluate_prediction.region
         assert DATA_FORMAT == evaluate_prediction._data_format
-        assert INPUT_PATHS == evaluate_prediction._input_paths
-        assert PREDICTION_PATH == evaluate_prediction._output_path
-        assert MODEL_URI == evaluate_prediction._uri
+        assert INPUT_PATHS == evaluate_prediction.input_paths
+        assert PREDICTION_PATH == evaluate_prediction.output_path
+        assert MODEL_URI == evaluate_prediction.uri
 
         assert TASK_PREFIX_SUMMARY == evaluate_summary.task_id
         assert DATAFLOW_OPTIONS == evaluate_summary.default_pipeline_options
@@ -135,35 +141,41 @@ class TestMlengineOperatorUtils(unittest.TestCase):
     @mock.patch.object(PythonOperator, "set_upstream")
     @mock.patch.object(BeamRunPythonPipelineOperator, "set_upstream")
     def test_create_evaluate_ops_model_and_version_name(self, mock_beam_pipeline, mock_python):
-        result = create_evaluate_ops(
-            task_prefix=TASK_PREFIX,
-            data_format=DATA_FORMAT,
-            input_paths=INPUT_PATHS,
-            prediction_path=PREDICTION_PATH,
-            metric_fn_and_keys=get_metric_fn_and_keys(),
-            validate_fn=validate_err_and_count,
-            batch_prediction_job_id=BATCH_PREDICTION_JOB_ID,
-            project_id=PROJECT_ID,
-            region=REGION,
-            dataflow_options=DATAFLOW_OPTIONS,
-            model_name=MODEL_NAME,
-            version_name=VERSION_NAME,
-        )
+        with pytest.warns(AirflowProviderDeprecationWarning, match=DEPRECATION_MESSAGE):
+            result = create_evaluate_ops(
+                task_prefix=TASK_PREFIX,
+                data_format=DATA_FORMAT,
+                input_paths=INPUT_PATHS,
+                prediction_path=PREDICTION_PATH,
+                metric_fn_and_keys=get_metric_fn_and_keys(),
+                validate_fn=validate_err_and_count,
+                batch_prediction_job_id=BATCH_PREDICTION_JOB_ID,
+                project_id=PROJECT_ID,
+                region=REGION,
+                dataflow_options=DATAFLOW_OPTIONS,
+                model_name=MODEL_NAME,
+                version_name=VERSION_NAME,
+            )
 
         evaluate_prediction, evaluate_summary, evaluate_validation = result
 
         mock_beam_pipeline.assert_called_once_with(evaluate_prediction)
         mock_python.assert_called_once_with(evaluate_summary)
 
+        # importing apache_beam elsewhere modifies the metrics. In order to avoid metrics being modified
+        # by apache_beam import happening after importing this test, we retrieve the metrics here rather than
+        # at the top of the file.
+        METRIC_FN_ENCODED = base64.b64encode(dill.dumps(METRIC_FN, recurse=True)).decode()
+
         assert TASK_PREFIX_PREDICTION == evaluate_prediction.task_id
-        assert PROJECT_ID == evaluate_prediction._project_id
-        assert BATCH_PREDICTION_JOB_ID == evaluate_prediction._job_id
-        assert REGION == evaluate_prediction._region
+        assert PROJECT_ID == evaluate_prediction.project_id
+        assert BATCH_PREDICTION_JOB_ID == evaluate_prediction.job_id
+        assert REGION == evaluate_prediction.region
         assert DATA_FORMAT == evaluate_prediction._data_format
-        assert INPUT_PATHS == evaluate_prediction._input_paths
-        assert PREDICTION_PATH == evaluate_prediction._output_path
-        assert MODEL_NAME == evaluate_prediction._model_name
-        assert VERSION_NAME == evaluate_prediction._version_name
+        assert INPUT_PATHS == evaluate_prediction.input_paths
+        assert PREDICTION_PATH == evaluate_prediction.output_path
+        assert MODEL_NAME == evaluate_prediction.model_name
+        assert VERSION_NAME == evaluate_prediction.version_name
 
         assert TASK_PREFIX_SUMMARY == evaluate_summary.task_id
         assert DATAFLOW_OPTIONS == evaluate_summary.default_pipeline_options
@@ -177,31 +189,37 @@ class TestMlengineOperatorUtils(unittest.TestCase):
     @mock.patch.object(PythonOperator, "set_upstream")
     @mock.patch.object(BeamRunPythonPipelineOperator, "set_upstream")
     def test_create_evaluate_ops_dag(self, mock_dataflow, mock_python):
-        result = create_evaluate_ops(
-            task_prefix=TASK_PREFIX,
-            data_format=DATA_FORMAT,
-            input_paths=INPUT_PATHS,
-            prediction_path=PREDICTION_PATH,
-            metric_fn_and_keys=get_metric_fn_and_keys(),
-            validate_fn=validate_err_and_count,
-            batch_prediction_job_id=BATCH_PREDICTION_JOB_ID,
-            dag=TEST_DAG,
-        )
+        with pytest.warns(AirflowProviderDeprecationWarning, match=DEPRECATION_MESSAGE):
+            result = create_evaluate_ops(
+                task_prefix=TASK_PREFIX,
+                data_format=DATA_FORMAT,
+                input_paths=INPUT_PATHS,
+                prediction_path=PREDICTION_PATH,
+                metric_fn_and_keys=get_metric_fn_and_keys(),
+                validate_fn=validate_err_and_count,
+                batch_prediction_job_id=BATCH_PREDICTION_JOB_ID,
+                dag=TEST_DAG,
+            )
 
         evaluate_prediction, evaluate_summary, evaluate_validation = result
 
         mock_dataflow.assert_called_once_with(evaluate_prediction)
         mock_python.assert_called_once_with(evaluate_summary)
 
+        # importing apache_beam elsewhere modifies the metrics. In order to avoid metrics being modified
+        # by apache_beam import happening after importing this test, we retrieve the metrics here rather than
+        # at the top of the file.
+        METRIC_FN_ENCODED = base64.b64encode(dill.dumps(METRIC_FN, recurse=True)).decode()
+
         assert TASK_PREFIX_PREDICTION == evaluate_prediction.task_id
-        assert PROJECT_ID == evaluate_prediction._project_id
-        assert BATCH_PREDICTION_JOB_ID == evaluate_prediction._job_id
-        assert REGION == evaluate_prediction._region
+        assert PROJECT_ID == evaluate_prediction.project_id
+        assert BATCH_PREDICTION_JOB_ID == evaluate_prediction.job_id
+        assert REGION == evaluate_prediction.region
         assert DATA_FORMAT == evaluate_prediction._data_format
-        assert INPUT_PATHS == evaluate_prediction._input_paths
-        assert PREDICTION_PATH == evaluate_prediction._output_path
-        assert MODEL_NAME == evaluate_prediction._model_name
-        assert VERSION_NAME == evaluate_prediction._version_name
+        assert INPUT_PATHS == evaluate_prediction.input_paths
+        assert PREDICTION_PATH == evaluate_prediction.output_path
+        assert MODEL_NAME == evaluate_prediction.model_name
+        assert VERSION_NAME == evaluate_prediction.version_name
 
         assert TASK_PREFIX_SUMMARY == evaluate_summary.task_id
         assert DATAFLOW_OPTIONS == evaluate_summary.default_pipeline_options
@@ -212,23 +230,28 @@ class TestMlengineOperatorUtils(unittest.TestCase):
         assert TASK_PREFIX_VALIDATION == evaluate_validation.task_id
         assert PREDICTION_PATH == evaluate_validation.templates_dict["prediction_path"]
 
+    @pytest.mark.db_test
     @mock.patch.object(GCSHook, "download")
     @mock.patch.object(PythonOperator, "set_upstream")
     @mock.patch.object(BeamRunPythonPipelineOperator, "set_upstream")
     def test_apply_validate_fn(self, mock_beam_pipeline, mock_python, mock_download):
-        result = create_evaluate_ops(
-            task_prefix=TASK_PREFIX,
-            data_format=DATA_FORMAT,
-            input_paths=INPUT_PATHS,
-            prediction_path=PREDICTION_PATH,
-            metric_fn_and_keys=get_metric_fn_and_keys(),
-            validate_fn=validate_err_and_count,
-            batch_prediction_job_id=BATCH_PREDICTION_JOB_ID,
-            project_id=PROJECT_ID,
-            region=REGION,
-            dataflow_options=DATAFLOW_OPTIONS,
-            model_uri=MODEL_URI,
-        )
+        with pytest.warns(
+            AirflowProviderDeprecationWarning,
+            match=DEPRECATION_MESSAGE,
+        ):
+            result = create_evaluate_ops(
+                task_prefix=TASK_PREFIX,
+                data_format=DATA_FORMAT,
+                input_paths=INPUT_PATHS,
+                prediction_path=PREDICTION_PATH,
+                metric_fn_and_keys=get_metric_fn_and_keys(),
+                validate_fn=validate_err_and_count,
+                batch_prediction_job_id=BATCH_PREDICTION_JOB_ID,
+                project_id=PROJECT_ID,
+                region=REGION,
+                dataflow_options=DATAFLOW_OPTIONS,
+                model_uri=MODEL_URI,
+            )
 
         _, _, evaluate_validation = result
 
@@ -269,7 +292,7 @@ class TestMlengineOperatorUtils(unittest.TestCase):
                 data_format=DATA_FORMAT,
                 input_paths=INPUT_PATHS,
                 prediction_path=PREDICTION_PATH,
-                metric_fn_and_keys=("error_and_squared_error", ['err', 'mse']),
+                metric_fn_and_keys=("error_and_squared_error", ["err", "mse"]),
                 validate_fn=validate_err_and_count,
             )
 

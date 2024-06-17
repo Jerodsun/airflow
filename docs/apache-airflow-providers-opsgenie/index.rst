@@ -19,26 +19,45 @@
 ``apache-airflow-providers-opsgenie``
 =====================================
 
-Content
--------
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: Basics
+
+    Home <self>
+    Changelog <changelog>
+    Security <security>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Guides
 
+    Connection types <connections>
     Operators <operators/index>
+    Notifications <notifications/index>
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: References
 
     Python API <_api/airflow/providers/opsgenie/index>
 
 .. toctree::
+    :hidden:
+    :maxdepth: 1
+    :caption: System tests
+
+    System Tests <_api/tests/system/providers/opsgenie/index>
+
+.. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Resources
 
-    Example DAGs <https://github.com/apache/airflow/tree/main/tests/system/providers/opsgenie>
+    Example DAGs <https://github.com/apache/airflow/tree/providers-opsgenie/|version|/tests/system/providers/opsgenie>
     PyPI Repository <https://pypi.org/project/apache-airflow-providers-opsgenie/>
     Installing from sources <installing-providers-from-sources>
 
@@ -46,41 +65,42 @@ Content
 
 
 .. toctree::
+    :hidden:
     :maxdepth: 1
     :caption: Commits
 
     Detailed list of commits <commits>
 
 
-Package apache-airflow-providers-opsgenie
+apache-airflow-providers-opsgenie package
 ------------------------------------------------------
 
-`Opsgenie <https://www.opsgenie.com/>`__
+`Opsgenie <https://www.atlassian.com/software/opsgenie>`__
 
 
-Release: 4.0.0
+Release: 5.6.1
 
 Provider package
 ----------------
 
-This is a provider package for ``opsgenie`` provider. All classes for this provider package
-are in ``airflow.providers.opsgenie`` python package.
+This package is for the ``opsgenie`` provider.
+All classes for this package are included in the ``airflow.providers.opsgenie`` python package.
 
 Installation
 ------------
 
-You can install this package on top of an existing Airflow 2 installation (see ``Requirements`` below)
-for the minimum Airflow version supported) via
-``pip install apache-airflow-providers-opsgenie``
+You can install this package on top of an existing Airflow 2 installation via
+``pip install apache-airflow-providers-opsgenie``.
+For the minimum Airflow version supported, see ``Requirements`` below.
 
 Requirements
 ------------
 
+The minimum Apache Airflow version supported by this provider package is ``2.7.0``.
+
 ==================  ==================
 PIP package         Version required
 ==================  ==================
-``apache-airflow``  ``>=2.2.0``
+``apache-airflow``  ``>=2.7.0``
 ``opsgenie-sdk``    ``>=2.1.5``
 ==================  ==================
-
-.. include:: ../../airflow/providers/opsgenie/CHANGELOG.rst

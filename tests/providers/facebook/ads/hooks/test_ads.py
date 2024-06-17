@@ -14,6 +14,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
 from unittest import mock
 
@@ -41,7 +42,7 @@ FIELDS = [
 PARAMS = {"level": "ad", "date_preset": "yesterday"}
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_hook():
     with mock.patch("airflow.hooks.base.BaseHook.get_connection") as conn:
         hook = FacebookAdsReportingHook(api_version=API_VERSION)
@@ -49,7 +50,7 @@ def mock_hook():
         yield hook
 
 
-@pytest.fixture()
+@pytest.fixture
 def mock_hook_multiple():
     with mock.patch("airflow.hooks.base.BaseHook.get_connection") as conn:
         hook = FacebookAdsReportingHook(api_version=API_VERSION)

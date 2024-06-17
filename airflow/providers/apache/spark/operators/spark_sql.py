@@ -15,9 +15,13 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#
-from typing import TYPE_CHECKING, Any, Optional, Sequence
+from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, Sequence
+
+from deprecated import deprecated
+
+from airflow.exceptions import AirflowProviderDeprecationWarning
 from airflow.models import BaseOperator
 from airflow.providers.apache.spark.hooks.spark_sql import SparkSqlHook
 
@@ -27,7 +31,7 @@ if TYPE_CHECKING:
 
 class SparkSqlOperator(BaseOperator):
     """
-    Execute Spark SQL query
+    Execute Spark SQL query.
 
     .. seealso::
         For more information on how to use this operator, take a look at the guide:
@@ -51,30 +55,30 @@ class SparkSqlOperator(BaseOperator):
         (Default: The ``queue`` value set in the Connection, or ``"default"``)
     """
 
-    template_fields: Sequence[str] = ('_sql',)
+    template_fields: Sequence[str] = ("sql",)
     template_ext: Sequence[str] = (".sql", ".hql")
-    template_fields_renderers = {'_sql': 'sql'}
+    template_fields_renderers = {"sql": "sql"}
 
     def __init__(
         self,
         *,
         sql: str,
-        conf: Optional[str] = None,
-        conn_id: str = 'spark_sql_default',
-        total_executor_cores: Optional[int] = None,
-        executor_cores: Optional[int] = None,
-        executor_memory: Optional[str] = None,
-        keytab: Optional[str] = None,
-        principal: Optional[str] = None,
-        master: Optional[str] = None,
-        name: str = 'default-name',
-        num_executors: Optional[int] = None,
+        conf: str | None = None,
+        conn_id: str = "spark_sql_default",
+        total_executor_cores: int | None = None,
+        executor_cores: int | None = None,
+        executor_memory: str | None = None,
+        keytab: str | None = None,
+        principal: str | None = None,
+        master: str | None = None,
+        name: str = "default-name",
+        num_executors: int | None = None,
         verbose: bool = True,
-        yarn_queue: Optional[str] = None,
+        yarn_queue: str | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-        self._sql = sql
+        self.sql = sql
         self._conf = conf
         self._conn_id = conn_id
         self._total_executor_cores = total_executor_cores
@@ -87,10 +91,19 @@ class SparkSqlOperator(BaseOperator):
         self._num_executors = num_executors
         self._verbose = verbose
         self._yarn_queue = yarn_queue
-        self._hook: Optional[SparkSqlHook] = None
+        self._hook: SparkSqlHook | None = None
 
-    def execute(self, context: "Context") -> None:
-        """Call the SparkSqlHook to run the provided sql query"""
+    @property
+    @deprecated(
+        reason="`_sql` is deprecated and will be removed in the future. Please use `sql` instead.",
+        category=AirflowProviderDeprecationWarning,
+    )
+    def _sql(self):
+        """Alias for ``sql``, used for compatibility (deprecated)."""
+        return self.sql
+
+    def execute(self, context: Context) -> None:
+        """Call the SparkSqlHook to run the provided sql query."""
         if self._hook is None:
             self._hook = self._get_hook()
         self._hook.run_query()
@@ -101,7 +114,7 @@ class SparkSqlOperator(BaseOperator):
         self._hook.kill()
 
     def _get_hook(self) -> SparkSqlHook:
-        """Get SparkSqlHook"""
+        """Get SparkSqlHook."""
         return SparkSqlHook(
             sql=self._sql,
             conf=self._conf,

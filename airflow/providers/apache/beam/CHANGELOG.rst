@@ -21,8 +21,311 @@
    and you want to add an explanation to the users on how they are supposed to deal with them.
    The changelog is updated and maintained semi-automatically by release manager.
 
+``apache-airflow-providers-apache-beam``
+
 Changelog
 ---------
+
+5.7.1
+.....
+
+Bug Fixes
+~~~~~~~~~
+
+* ``Fix deferrable mode for BeamRunJavaPipelineOperator (#39371)``
+
+Misc
+~~~~
+
+* ``Faster 'airflow_version' imports (#39552)``
+* ``Simplify 'airflow_version' imports (#39497)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Reapply templates for all providers (#39554)``
+
+5.7.0
+.....
+
+.. note::
+  This release of provider is only available for Airflow 2.7+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+Bug Fixes
+~~~~~~~~~
+
+* ``Bugfix to correct GCSHook being called even when not required with BeamRunPythonPipelineOperator (#38716)``
+
+Misc
+~~~~
+
+* ``Bump minimum Airflow version in providers to Airflow 2.7.0 (#39240)``
+
+5.6.3
+.....
+
+Bug Fixes
+~~~~~~~~~
+
+* ``fix: skip apache beam pipeline options if value is set to false (#38496)``
+* ``Fix side-effect of default options in Beam Operators (#37916)``
+* ``Avoid to use subprocess in asyncio loop (#38292)``
+* ``Avoid change attributes into the constructor in Apache Beam operators (#37934)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``fix: try002 for provider apache beam (#38790)``
+   * ``Bump ruff to 0.3.3 (#38240)``
+   * ``bump mypy version to 1.9.0 (#38239)``
+   * ``Resolve G004: Logging statement uses f-string (#37873)``
+
+5.6.2
+.....
+
+Misc
+~~~~
+
+* ``Add Python 3.12 exclusions in providers/pyproject.toml (#37404)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Add comment about versions updated by release manager (#37488)``
+
+5.6.1
+.....
+
+Misc
+~~~~
+
+* ``feat: Switch all class, functions, methods deprecations to decorators (#36876)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Split contributing docs to multiple files (#36969)``
+
+5.6.0
+.....
+
+Misc
+~~~~
+
+* ``Get rid of pyarrow-hotfix for CVE-2023-47248 (#36697)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Standardize airflow build process and switch to Hatchling build backend (#36537)``
+   * ``Prepare docs 1st wave of Providers January 2024 (#36640)``
+   * ``Speed up autocompletion of Breeze by simplifying provider state (#36499)``
+   * ``Provide the logger_name param in providers hooks in order to override the logger name (#36675)``
+   * ``Revert "Provide the logger_name param in providers hooks in order to override the logger name (#36675)" (#37015)``
+   * ``Prepare docs 2nd wave of Providers January 2024 (#36945)``
+
+5.5.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add ability to run streaming Job for BeamRunPythonPipelineOperator in non deferrable mode (#36108)``
+* ``Implement deferrable mode for BeamRunJavaPipelineOperator (#36122)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+
+5.4.0
+.....
+
+.. note::
+  This release of provider is only available for Airflow 2.6+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+Misc
+~~~~
+
+* ``Bump minimum Airflow version in providers to Airflow 2.6.0 (#36017)``
+
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Fix and reapply templates for provider documentation (#35686)``
+   * ``Prepare docs 3rd wave of Providers October 2023 - FIX (#35233)``
+   * ``Prepare docs 2nd wave of Providers November 2023 (#35836)``
+   * ``Use reproducible builds for provider packages (#35693)``
+   * ``Prepare docs 1st wave of Providers November 2023 (#35537)``
+   * ``Prepare docs 3rd wave of Providers October 2023 (#35187)``
+   * ``Pre-upgrade 'ruff==0.0.292' changes in providers (#35053)``
+
+5.3.0
+.....
+
+.. note::
+  This release of provider is only available for Airflow 2.5+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+Misc
+~~~~
+
+* ``Bump min airflow version of providers (#34728)``
+* ``Use 'airflow.exceptions.AirflowException' in providers (#34511)``
+
+
+5.2.3
+.....
+
+Misc
+~~~~
+
+* ``Replace sequence concatenation by unpacking in Airflow providers (#33933)``
+* ``Improve modules import in Airflow providers by some of them into a type-checking block (#33754)``
+
+5.2.2
+.....
+
+Bug Fixes
+~~~~~~~~~
+
+* ``Fix wrong OR condition when evaluating beam version < 2.39.0 (#33308)``
+
+Misc
+~~~~
+
+* ``Refactor: Simplify code in Apache/Alibaba providers (#33227)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``D401 Support - Providers: Airbyte to Atlassian (Inclusive) (#33354)``
+   * ``D205 Support - Providers - Final Pass (#33303)``
+
+5.2.1
+.....
+
+Misc
+~~~~
+
+* ``Allow downloading requirements file from GCS in 'BeamRunPythonPipelineOperator' (#31645)``
+
+5.2.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add deferrable mode to 'BeamRunPythonPipelineOperator' (#31471)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Prepare docs for July 2023 wave of Providers (RC2) (#32381)``
+   * ``Remove spurious headers for provider changelogs (#32373)``
+   * ``Prepare docs for July 2023 wave of Providers (#32298)``
+   * ``D205 Support - Providers: Apache to Common (inclusive) (#32226)``
+   * ``Improve provider documentation and README structure (#32125)``
+
+5.1.1
+.....
+
+.. note::
+  This release dropped support for Python 3.7
+
+Misc
+~~~~
+
+* ``Add note about dropping Python 3.7 for providers (#32015)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Add D400 pydocstyle check - Apache providers only (#31424)``
+
+5.1.0
+.....
+
+.. note::
+  This release of provider is only available for Airflow 2.4+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+Misc
+~~~~
+
+* ``Bump minimum Airflow version in providers (#30917)``
+* ``Update SDKs for google provider package (#30067)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Add full automation for min Airflow version for providers (#30994)``
+   * ``Use '__version__' in providers not 'version' (#31393)``
+   * ``Fixing circular import error in providers caused by airflow version check (#31379)``
+   * ``Prepare docs for May 2023 wave of Providers (#31252)``
+
+5.0.0
+......
+
+Breaking changes
+~~~~~~~~~~~~~~~~
+
+.. warning::
+  In this version of the provider, deprecated GCS and Dataflow hooks' param ``delegate_to`` is removed from all Beam operators.
+  Impersonation can be achieved instead by utilizing the ``impersonation_chain`` param.
+
+* ``remove delegate_to from GCP operators and hooks (#30748)``
+
+.. Review and move the new changes to one of the sections above:
+   * ``Add mechanism to suspend providers (#30422)``
+
+4.3.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Get rid of state in Apache Beam provider hook (#29503)``
+
+4.2.0
+.....
+
+Features
+~~~~~~~~
+
+* ``Add support for running a Beam Go pipeline with an executable binary (#28764)``
+
+Misc
+~~~~
+* ``Deprecate 'delegate_to' param in GCP operators and update docs (#29088)``
+
+4.1.1
+.....
+
+Bug Fixes
+~~~~~~~~~
+* ``Ensure Beam Go file downloaded from GCS still exists when referenced (#28664)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+
+4.1.0
+.....
+
+.. note::
+  This release of provider is only available for Airflow 2.3+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
+
+Misc
+~~~~
+
+* ``Move min airflow version to 2.3.0 for all providers (#27196)``
+
+Features
+~~~~~~~~
+
+* ``Add backward compatibility with old versions of Apache Beam (#27263)``
+
+.. Below changes are excluded from the changelog. Move them to
+   appropriate section above if needed. Do not delete the lines(!):
+   * ``Add documentation for July 2022 Provider's release (#25030)``
+   * ``Update old style typing (#26872)``
+   * ``Enable string normalization in python formatting - providers (#27205)``
+   * ``Update docs for September Provider's release (#26731)``
+   * ``Apply PEP-563 (Postponed Evaluation of Annotations) to non-core airflow (#26289)``
+   * ``Prepare docs for new providers release (August 2022) (#25618)``
+   * ``Move provider dependencies to inside provider folders (#24672)``
 
 4.0.0
 .....
@@ -30,8 +333,9 @@ Changelog
 Breaking changes
 ~~~~~~~~~~~~~~~~
 
-* This release of provider is only available for Airflow 2.2+ as explained in the Apache Airflow
-  providers support policy https://github.com/apache/airflow/blob/main/README.md#support-for-providers
+.. note::
+  This release of provider is only available for Airflow 2.2+ as explained in the
+  `Apache Airflow providers support policy <https://github.com/apache/airflow/blob/main/PROVIDERS.rst#minimum-supported-version-of-airflow-for-community-managed-providers>`_.
 
 Features
 ~~~~~~~~
@@ -49,6 +353,7 @@ Misc
    * ``Add explanatory note for contributors about updating Changelog (#24229)``
    * ``AIP-47 - Migrate beam DAGs to new design #22439 (#24211)``
    * ``Prepare docs for May 2022 provider's release (#24231)``
+   * ``Update package description to remove double min-airflow specification (#24292)``
 
 3.4.0
 .....

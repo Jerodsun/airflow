@@ -15,6 +15,7 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+from __future__ import annotations
 
 from flask import Blueprint
 from flask_appbuilder import BaseView as AppBuilderBaseView, expose
@@ -28,9 +29,11 @@ from airflow.models.baseoperator import BaseOperator
 # This is the class you derive to create a plugin
 from airflow.plugins_manager import AirflowPlugin
 from airflow.sensors.base import BaseSensorOperator
+from airflow.task.priority_strategy import PriorityWeightStrategy
 from airflow.ti_deps.deps.base_ti_dep import BaseTIDep
 from airflow.timetables.interval import CronDataIntervalTimetable
 from tests.listeners import empty_listener
+from tests.listeners.class_listener import ClassBasedListener
 from tests.test_utils.mock_operators import (
     AirflowLink,
     AirflowLink2,
@@ -76,7 +79,12 @@ class PluginTestAppBuilderBaseView(AppBuilderBaseView):
 
 
 v_appbuilder_view = PluginTestAppBuilderBaseView()
-v_appbuilder_package = {"name": "Test View", "category": "Test Plugin", "view": v_appbuilder_view}
+v_appbuilder_package = {
+    "name": "Test View",
+    "category": "Test Plugin",
+    "view": v_appbuilder_view,
+    "label": "Test Label",
+}
 
 v_nomenu_appbuilder_package = {"view": v_appbuilder_view}
 
@@ -96,9 +104,9 @@ appbuilder_mitem_toplevel = {
 bp = Blueprint(
     "test_plugin",
     __name__,
-    template_folder='templates',  # registers airflow/plugins/templates as a Jinja template folder
-    static_folder='static',
-    static_url_path='/static/test_plugin',
+    template_folder="templates",  # registers airflow/plugins/templates as a Jinja template folder
+    static_folder="static",
+    static_url_path="/static/test_plugin",
 )
 
 
@@ -109,6 +117,11 @@ class CustomCronDataIntervalTimetable(CronDataIntervalTimetable):
 
 class CustomTestTriggerRule(BaseTIDep):
     pass
+
+
+class CustomPriorityWeightStrategy(PriorityWeightStrategy):
+    def get_weight(self, ti):
+        return 1
 
 
 # Defining the plugin class
@@ -128,24 +141,25 @@ class AirflowTestPlugin(AirflowPlugin):
     ]
     operator_extra_links = [GoogleLink(), AirflowLink2(), CustomOpLink(), CustomBaseIndexOpLink(1)]
     timetables = [CustomCronDataIntervalTimetable]
-    listeners = [empty_listener]
+    listeners = [empty_listener, ClassBasedListener()]
     ti_deps = [CustomTestTriggerRule()]
+    priority_weight_strategies = [CustomPriorityWeightStrategy]
 
 
 class MockPluginA(AirflowPlugin):
-    name = 'plugin-a'
+    name = "plugin-a"
 
 
 class MockPluginB(AirflowPlugin):
-    name = 'plugin-b'
+    name = "plugin-b"
 
 
 class MockPluginC(AirflowPlugin):
-    name = 'plugin-c'
+    name = "plugin-c"
 
 
 class AirflowTestOnLoadPlugin(AirflowPlugin):
-    name = 'preload'
+    name = "preload"
 
     def on_load(self, *args, **kwargs):
-        self.name = 'postload'
+        self.name = "postload"
